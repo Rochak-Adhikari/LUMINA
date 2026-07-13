@@ -109,3 +109,7 @@ class AgentRegistry(RegistryBase[Any]):
 
 class ToolRegistry(RegistryBase[Any]):
     """Registry for Gemini function declaration tool specs."""
+
+
+class ToolDispatcherRegistry(RegistryBase[Callable]):
+    """Registry for dispatcher handlers that execute Gemini function calls."""
