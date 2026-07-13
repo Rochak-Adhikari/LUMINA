@@ -1126,6 +1126,16 @@ async def start_audio(sid, data=None):
     def on_tool_confirmation(data):
         # data = {"id": "uuid", "tool": "tool_name", "args": {...}}
         print(f"Requesting confirmation for tool: {data.get('tool')}")
+        # Phase 2 (runtime migration): mirror the pending confirmation id
+        # into BrainState via the RuntimeFacade/BrainStateAdapter. Additive
+        # only — lumina.py's own _pending_confirmations dict remains the
+        # sole source of truth for resolving the asyncio Future; this call
+        # cannot affect that behaviour.
+        try:
+            with _runtime_facade.brain_state_adapter.transaction() as draft:
+                draft.pending_confirmation_id = data.get('id')
+        except Exception as e:
+            print(f"[DI] BrainState pending-confirmation mirror failed (non-fatal): {e}")
         asyncio.create_task(sio.emit('tool_confirmation_request', data))
 
     # Callback to send CAD status to frontend
@@ -1438,11 +1448,21 @@ async def confirm_tool(sid, data):
     confirmed = data.get('confirmed', False)
     
     print(f"[SERVER DEBUG] Received confirmation response for {request_id}: {confirmed}")
-    
+
     if audio_loop:
         audio_loop.resolve_tool_confirmation(request_id, confirmed)
     else:
         print("Audio loop not active, cannot resolve confirmation.")
+
+    # Phase 2 (runtime migration): clear the mirrored BrainState confirmation
+    # id via RuntimeFacade/BrainStateAdapter. Additive only — does not affect
+    # the resolution above, which already completed via audio_loop directly.
+    try:
+        with _runtime_facade.brain_state_adapter.transaction() as draft:
+            if draft.pending_confirmation_id == request_id:
+                draft.pending_confirmation_id = None
+    except Exception as e:
+        print(f"[DI] BrainState pending-confirmation clear failed (non-fatal): {e}")
 
 @sio.event
 async def shutdown(sid, data=None):
