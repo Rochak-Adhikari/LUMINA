@@ -102,8 +102,8 @@ local_browser_control_tool = {
         "clicking elements, filling forms, reading live page content, inspecting browser state, "
         "analyzing the current browser screen, or scrolling/navigating within a loaded page.\n"
         "Do NOT use this for: opening websites, searching Google, opening YouTube, "
-        "opening Spotify, playing music, or any task that can be handled by browser_open, "
-        "youtube_control, or open_app.\n"
+        "opening Spotify, playing music, or any task that can be handled by browser_open "
+        "or open_app.\n"
         "Do NOT call this alongside other tools for a single request.\n"
         "DECISION ORDER for clicking: 1) click_text, 2) click_best, 3) get_clickables, "
         "4) screenshot, 5) click_at.\n"
@@ -269,7 +269,7 @@ open_app_tool = {
         "Open, close, focus, or check if an application is running on the desktop. "
         "Use ONLY when the user explicitly asks to open, close, or focus a specific desktop app. "
         "Examples: 'open Discord', 'open Spotify', 'open VS Code', 'open Telegram', 'open Notepad'. "
-        "Do NOT call this alongside browser_open or youtube_control for the same request. "
+        "Do NOT call this alongside browser_open for the same request. "
         "Do NOT call this speculatively — only when the user names a specific app to open."
     ),
     "parameters": {
@@ -402,11 +402,15 @@ browser_open_tool = {
         "Opens a website, URL, or named web service in Lumina's dedicated Brave browser. "
         "Use when the user asks to open a specific website or search Google. "
         "All URLs open in Lumina's isolated Brave instance — never in the user's personal browser.\n"
-        "Correct uses: open a URL, open a named site (GitHub, Gmail, Reddit, Instagram, Twitter, etc.), "
-        "Google search for something, open a streaming site home page.\n"
-        "Do NOT use this for: opening desktop apps (use open_app), YouTube tasks (use youtube_control), "
-        "or on-page browser interaction (use local_browser_control).\n"
-        "Do NOT call this alongside open_app or youtube_control for the same request.\n"
+        "Correct uses: open a URL, open a named site (GitHub, Gmail, Reddit, Instagram, Twitter, YouTube, etc.), "
+        "Google search for something, open a streaming site, open YouTube or search/play YouTube videos.\n"
+        "YouTube examples:\n"
+        "  open YouTube home  → browser_open(action=open_url, url=https://www.youtube.com)\n"
+        "  search/play on YouTube → browser_open(action=open_url, url=https://www.youtube.com/results?search_query=<query>)\n"
+        "Do NOT use this for: opening desktop apps (use open_app), "
+        "on-page browser interaction (use local_browser_control), "
+        "or PLAYING a video on YouTube (use youtube_play for that).\n"
+        "Do NOT call this alongside open_app for the same request.\n"
         "Actions: open_url | google_search | open_site. Auto-detected if omitted."
     ),
     "parameters": {
@@ -421,35 +425,41 @@ browser_open_tool = {
     }
 }
 
-youtube_control_tool = {
-    "name": "youtube_control",
+
+youtube_play_tool = {
+    "name": "youtube_play",
     "description": (
-        "Handles YouTube tasks: open YouTube home, search, play a video/song, open a channel, "
-        "trending, shorts, music, subscriptions, library, history.\n"
-        "Use when the user asks for any YouTube-specific action.\n"
-        "Do NOT use local_browser_control or browser_open for YouTube tasks.\n"
-        "Do NOT call this alongside browser_open or open_app for the same request.\n"
-        "Do NOT use this for Spotify requests — use spotify_control instead.\n"
-        "Actions: open_home | search | play_first | open_channel | trending | shorts | music | "
-        "subscriptions | library | history | open_url."
+        "Search for and automatically play a video on YouTube in Lumina's browser.\n"
+        "Use this when the user wants to PLAY a specific video, song, or artist on YouTube.\n"
+        "This tool automatically: (1) opens YouTube search results, (2) finds the best matching "
+        "video title, (3) clicks it to start playback. No follow-up steps needed from you.\n"
+        "Use browser_open instead for: just opening YouTube, browsing YouTube, or searching "
+        "YouTube without immediately playing something.\n"
+        "Examples:\n"
+        "  'play rasputin on youtube'       -> youtube_play(query='rasputin')\n"
+        "  'play lofi music on youtube'     -> youtube_play(query='lofi music')\n"
+        "  'play something chill'           -> youtube_play(query='chill music')\n"
+        "  'youtube play coldplay yellow'   -> youtube_play(query='coldplay yellow')\n"
+        "Do NOT use for Spotify — use spotify_control for Spotify requests."
     ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "action":  {"type": "STRING", "description": "Action to perform (see description). Default: 'open_home'."},
-            "query":   {"type": "STRING", "description": "Search term or song/video name (for search, play_first, music)."},
-            "channel": {"type": "STRING", "description": "Channel name or @handle (for open_channel)."},
-            "url":     {"type": "STRING", "description": "Specific YouTube URL or video ID (for open_url)."},
+            "query": {
+                "type": "STRING",
+                "description": "What to search and play on YouTube (song title, artist, topic, genre, etc.)"
+            }
         },
-        "required": []
+        "required": ["query"]
     }
 }
+
 
 spotify_control_tool = {
     "name": "spotify_control",
     "description": (
         "Controls the Spotify DESKTOP APP directly. Use for ALL Spotify requests.\n"
-        "NEVER use browser_open, youtube_control, or local_browser_control for Spotify.\n"
+        "NEVER use browser_open or local_browser_control for Spotify.\n"
         "NEVER route Spotify playback/search to YouTube — always use this tool.\n"
         "Supported actions:\n"
         "  open         — launch or focus Spotify desktop app\n"
@@ -475,7 +485,7 @@ spotify_control_tool = {
         "  'play mana ka kura on Spotify' → spotify_control action=play_query query=mana ka kura\n"
         "  'open liked songs on Spotify' → spotify_control action=open_liked\n"
         "  'open my library on Spotify' → spotify_control action=open_library\n"
-        "Do NOT call this alongside browser_open, youtube_control, or open_app for the same request."
+        "Do NOT call this alongside browser_open or open_app for the same request."
     ),
     "parameters": {
         "type": "OBJECT",
@@ -487,6 +497,159 @@ spotify_control_tool = {
     }
 }
 
+# Phase 5: Imported from Jarvis-MK37
+code_helper_tool = {
+    "name": "code_helper",
+    "description": (
+        "Writes, edits, explains, runs, builds, optimizes, or debugs code files. "
+        "Use when the user asks to write code, edit a file, explain code, run a script, "
+        "build and test code, optimize/refactor code, or debug screen errors. "
+        "The 'auto' action intelligently detects intent from the description."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {"type": "STRING", "description": "write | edit | explain | run | build | optimize | screen_debug | auto (default: auto)"},
+            "description": {"type": "STRING", "description": "What the code should do or what change to make"},
+            "language": {"type": "STRING", "description": "Programming language (default: python)"},
+            "output_path": {"type": "STRING", "description": "Where to save the file"},
+            "file_path": {"type": "STRING", "description": "Path to existing file for edit/explain/run/build/optimize"},
+            "code": {"type": "STRING", "description": "Raw code string for explain/optimize"},
+            "args": {"type": "STRING", "description": "CLI arguments for run/build"},
+            "timeout": {"type": "INTEGER", "description": "Execution timeout in seconds (default: 30)"}
+        },
+        "required": ["action"]
+    }
+}
+
+# Phase M.2: File Processor — AI-powered file analysis (ported from Mark-XLVI)
+file_processor_tool = {
+    "name": "file_processor",
+    "description": (
+        "Analyze, process, or convert any uploaded file using AI. "
+        "Supports images (describe, OCR, resize, convert, compress), "
+        "PDFs (summarize, extract text, convert to Word), "
+        "documents (DOCX, TXT, MD — summarize, reformat, word count), "
+        "data files (CSV, Excel — analyze, filter, sort, stats, convert), "
+        "JSON (validate, format, analyze, convert), "
+        "code files (explain, review, fix, run, optimize, document), "
+        "audio (transcribe, trim, convert, info), "
+        "video (info, trim, extract audio/frame, compress, transcribe), "
+        "archives (list contents, extract), "
+        "presentations (PPTX — summarize, extract text). "
+        "If no action is specified, the best action is auto-detected."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "file_path":   {"type": "STRING", "description": "Path to the file to process."},
+            "action":      {"type": "STRING", "description": "What to do: describe, ocr, summarize, analyze, extract_text, resize, convert, compress, info, filter, sort, stats, explain, review, fix, run, transcribe, trim, list, extract, etc. Auto-detected if omitted."},
+            "instruction": {"type": "STRING", "description": "Custom instruction for AI processing (overrides default prompt)."},
+            "format":      {"type": "STRING", "description": "Target format for convert actions (e.g. 'png', 'csv', 'mp3')."},
+            "width":       {"type": "INTEGER", "description": "Width for image resize."},
+            "height":      {"type": "INTEGER", "description": "Height for image resize."},
+            "scale":       {"type": "NUMBER", "description": "Scale factor for image resize (e.g. 0.5 for half)."},
+            "quality":     {"type": "INTEGER", "description": "Quality level for compress (0-100 for images, CRF for video)."},
+            "column":      {"type": "STRING", "description": "Column name for data filter/sort."},
+            "value":       {"type": "STRING", "description": "Filter value."},
+            "condition":   {"type": "STRING", "description": "Filter condition: equals, contains, gt, lt."},
+            "start":       {"type": "STRING", "description": "Start time for trim (seconds or HH:MM:SS)."},
+            "end":         {"type": "STRING", "description": "End time for trim."},
+            "timestamp":   {"type": "STRING", "description": "Timestamp for video frame extraction (HH:MM:SS)."},
+        },
+        "required": ["file_path"]
+    }
+}
+
+# Phase M.3: Dev Agent — Multi-file project builder (ported from Mark-XLVI)
+dev_agent_tool = {
+    "name": "dev_agent",
+    "description": (
+        "Build a complete multi-file software project from a description. "
+        "Plans the file structure, writes every file with proper imports and "
+        "cross-references, installs dependencies, opens VS Code, runs the project, "
+        "and auto-fixes errors up to 5 times. "
+        "Use this when the user wants to build a full application, tool, game, "
+        "website, API, or any multi-file project — NOT for single code snippets "
+        "(use code_helper for those). "
+        "Supports Python, JavaScript, TypeScript, and any language Gemini can generate. "
+        "Projects are saved to ~/Desktop/LuminaProjects/."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "description":  {"type": "STRING",  "description": "What the project should do. Be specific about features, UI, and behavior."},
+            "language":     {"type": "STRING",  "description": "Programming language (default: python). Examples: python, javascript, typescript, html, java, go, rust."},
+            "project_name": {"type": "STRING",  "description": "Name for the project folder (auto-generated from description if omitted)."},
+            "timeout":      {"type": "INTEGER", "description": "Run timeout in seconds per attempt (default: 30). Use higher values for servers or GUI apps."},
+        },
+        "required": ["description"]
+    }
+}
+
+
+# Phase M.4: Flight Finder — Find flight options using Google Flights
+flight_finder_tool = {
+    "name": "flight_finder",
+    "description": (
+        "Search and analyze flight options from an origin to a destination airport/city on Google Flights. "
+        "Can optionally schedule return flights, configure cabin class (economy, premium, business, first), "
+        "specify passenger count, and save/export results to a text file on the Desktop."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "origin":      {"type": "STRING",  "description": "Departure airport code or city name (e.g. 'NYC', 'London', 'LAX')."},
+            "destination": {"type": "STRING",  "description": "Arrival airport code or city name (e.g. 'IST', 'SFO', 'London')."},
+            "date":        {"type": "STRING",  "description": "Departure date in YYYY-MM-DD format or natural language (e.g. 'tomorrow', 'next Monday', 'June 15')."},
+            "return_date": {"type": "STRING",  "description": "Optional return date in YYYY-MM-DD format or natural language."},
+            "passengers":  {"type": "INTEGER", "description": "Number of passengers (default: 1)."},
+            "cabin":       {"type": "STRING",  "description": "Cabin class: economy | premium | business | first (default: economy)."},
+            "save":        {"type": "BOOLEAN", "description": "If true, saves search results to a text file on the Desktop."}
+        },
+        "required": ["origin", "destination", "date"]
+    }
+}
+
+# Phase M.5: Game Updater — Manage Steam & Epic Games installations/updates
+game_updater_tool = {
+    "name": "game_updater",
+    "description": (
+        "Install, update, list, and monitor downloads for Steam and Epic Games. "
+        "Allows scheduling daily updates, cancelling schedules, querying schedule status, "
+        "checking active download progress, and optionally shutting down the computer when downloads finish."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action":             {"type": "STRING",  "description": "Action to perform: update (check/trigger updates) | install (install a new game) | list (list installed games) | download_status (check download progress) | schedule (schedule daily update) | cancel_schedule | schedule_status (default: update)."},
+            "platform":           {"type": "STRING",  "description": "Target game store platform: steam | epic | both (default: both)."},
+            "game_name":          {"type": "STRING",  "description": "Name of the game (optional for update/list, required for install)."},
+            "app_id":             {"type": "STRING",  "description": "Steam AppID of the game (optional, used as fallback for install)."},
+            "hour":               {"type": "INTEGER", "description": "Hour for daily update schedule (0-23, default: 3)."},
+            "minute":             {"type": "INTEGER", "description": "Minute for daily update schedule (0-59, default: 0)."},
+            "shutdown_when_done": {"type": "BOOLEAN", "description": "Auto-shutdown computer when active downloads finish (default: false)."}
+        },
+        "required": []
+    }
+}
+
+# Navigation UI — programmatically switch panels
+navigate_ui_tool = {
+    "name": "navigate_ui",
+    "description": "Navigates Lumina's screen interface to a specific panel or view. Use this when the user asks to open settings, show the archive, view features, go to the calendar/events, or return home.",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "panel": {
+                "type": "STRING",
+                "description": "Target panel name: 'home' | 'features' | 'events' | 'archive' | 'settings'."
+            }
+        },
+        "required": ["panel"]
+    }
+}
+
 tools_list = [{"function_declarations": [
     generate_cad_prototype_tool,
     write_file_tool,
@@ -494,6 +657,7 @@ tools_list = [{"function_declarations": [
     read_file_tool,
     browser_control_tool,
     local_browser_control_tool,
+    navigate_ui_tool,
     # Phase M: Mark-XXX Integrated Action Tools
     cmd_control_tool,
     file_controller_tool,
@@ -507,6 +671,13 @@ tools_list = [{"function_declarations": [
     screen_process_tool,
     desktop_control_tool,
     browser_open_tool,
-    youtube_control_tool,
+    youtube_play_tool,
     spotify_control_tool,
+    code_helper_tool,
+    file_processor_tool,
+    dev_agent_tool,
+    flight_finder_tool,
+    game_updater_tool,
 ]}]
+
+

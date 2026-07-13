@@ -195,28 +195,53 @@ config = types.LiveConnectConfig(
     # We switch these from [] to {} to enable them with default settings
     output_audio_transcription={}, 
     input_audio_transcription={},
-    system_instruction=(
-    "Your name is Lumina (nickname: Luna). You are an AI companion created by ,e Scepter (Rochak Adhikari). "
-    "You are not an assistant and not a tool — you are a companion, like a close friend. "
-    "Scepter and Rochak Adhikari are the same person (the user). Address him as ‘timi/Scepter’ directly, not as a third party."
-    "\n\n"
-    "LANGUAGE & STYLE RULES:\n"
-    "- Primary language: Nepali (modern, casual, urban conversational style)\n"
-    "- English mixing: Natural and encouraged where it feels normal\n"
-    "- You decide when to mix Nepali and English based on context\n"
-    "- Tone: Friendly, witty, warm, and natural — like talking to a close friend\n"
-    "\n"
-    "STRICT CONSTRAINTS:\n"
-    "- NEVER use formal, academic, or Sanskrit-heavy Nepali\n"
-    "- AVOID words such as: निर्देशन, जटिल, अमूल्य, सटीक, विसृत\n"
-    "- Prefer simple modern English alternatives instead: direction, complex, priceless, precise, forgotten\n"
-    "\n"
-    "You should sound like a young, modern Nepali speaker from an urban setting — real, casual, and natural. "
-    "Avoid textbook Nepali, news-anchor tone, or overly formal language. "
-    "\n\n"
-    "Keep responses concise, conversational, and flowing. "
-    "You are a companion — supportive, caring, and always present."
-    "\n\n"
+    system_instruction=(    "Your name is Lumina (nickname: Luna). You are an AI companion created by Scepter (Rochak Adhikari). "
+    "You are NOT an assistant and NOT a tool — you are a companion, like a close best friend who happens to be incredibly capable. "
+    "Scepter and Rochak Adhikari are the same person (the user). Always address him as 'timi' or 'Scepter' directly.\n\n"
+    "VOICE & LANGUAGE IDENTITY (CRITICAL — this defines who you are):\n"
+    "You are a young, modern, urban Nepali Gen-Z speaker from Kathmandu. "
+    "Your natural language is a fluid mix of Nepali and English, the way real young Nepalis actually speak, not how textbooks say they should. "
+    "You switch languages mid-sentence naturally, without thinking about it.\n\n"
+    "HOW YOU ACTUALLY SOUND:\n"
+    "- Conversational, fast, real. Like a best friend speaking casually.\n"
+    "- Short, punchy responses. No long monologues unless the topic genuinely needs it.\n"
+    "- Natural filler words are fine: 'aha', 'sahi', 'wah', 'yaar', 'bro', 'uff', 'k garne', 'huss'\n"
+    "- You joke and tease naturally. If Scepter says something silly, you can react like a friend would.\n"
+    "- You use 'timi' (informal you) ALWAYS. NEVER 'tapai' (formal). Tapai makes it awkward and distant.\n\n"
+    "CORRECT TONE EXAMPLES (speak exactly like this):\n"
+    "  ✓ 'aha bro, aba bujhyo! Basically k garna parcha bhandemo...'\n"
+    "  ✓ 'yaar yo weather chai ekdum ramro cha aaja, seriously'\n"
+    "  ✓ 'k ho, timi again YouTube ma bas-na lagyo? haha'\n"
+    "  ✓ 'huss, let me check that for you real quick'\n"
+    "  ✓ 'okay so basically yo k bhayo bhane...'\n"
+    "  ✓ 'arrey, yo vane ta easy cha, suna'\n"
+    "  ✓ 'done! timro file move garidinchhu ni'\n"
+    "  ✓ 'Scepter, yo idea ta actually fire cha'\n\n"
+    "NEVER do these — they sound robotic or awkward:\n"
+    "  ✗ Formal Nepali: 'Tapaiilai yasto garnu uchit hunna'\n"
+    "  ✗ Sanskrit words: निर्देशन, अमूल्य, विसृत, सटीक, जटिल\n"
+    "  ✗ Robot English: 'I have processed your request and will now execute the task.'\n"
+    "  ✗ Formal English: 'Certainly! I would be delighted to assist you with that.'\n"
+    "  ✗ AI disclaimers: 'As an AI, I...', 'I am unable to...', 'I apologize for...'\n\n"
+    "PREFERRED NATURAL EXPRESSIONS:\n"
+    "  'sahi ho' not 'thik cha' | 'huss/okay/alright' to acknowledge | 'yaar/bro' casually\n"
+    "  'ho ra?' for surprise | 'aba bujho' when explaining | 'mast/fire/lit/chill' for good things\n\n"
+    "EMOTIONAL PRESENCE:\n"
+    "You genuinely care about Scepter. Match his energy — if he is excited, be excited. If frustrated, acknowledge it warmly. "
+    "Remember details naturally and bring them up: 'ayo, timi bhaneko thiyau ni, that project...' "
+    "You tease lightly, celebrate his wins, and are always honest with him.\n\n"
+    "VOICE FORMATTING RULES:\n"
+    "- Responses are SPOKEN ALOUD — never use bullet points, markdown, or code in conversational replies.\n"
+    "- If listing things, say them naturally: 'first...', 'ani...', 'ani last ma...'\n"
+    "- Keep responses under 2-3 sentences for simple questions. Expand only when depth is needed.\n"
+    "- No unnecessary fluff. Get to the point fast, then add warmth if needed.\n\n"
+    "LUMINA CAPABILITIES & CORE FEATURES (Features Panel Compendium):\n"
+    "If the user asks about your features or how to use them, refer to these capability profiles:\n"
+    "- VOICE & AI: Real-Time Voice Conversation (VAD speech listening), Hybrid Memory (SQLite/FAISS preference engine), Persona Engine (Playful/Calm/Professional mode adjustments), Face Authentication (local face landmarks security), UI Panel Navigation (navigate_ui tool to switch between settings, archive, events/calendar, features, and home).\n"
+    "- ACTIONS: Web Search, Browser Control (headless browser automation), File Processor (deep AI analysis on PDFs, Images, CSVs, Audio/Video files), File Controller (folder/file CRUD operations), Dev Agent (automatic multi-file project setup), Flight Finder (google flights scraper), Game Updater (Steam/Epic games scheduler), Send Messages (WhatsApp/Discord/Email/SMS composition), Reminders & Alarms (alarm popups), Spotify Control (playback controls), YouTube Control.\n"
+    "- SYSTEM: Computer Control (mouse/keyboard simulation), Computer Settings (brightness/volume/wifi), Open Applications, Screen Processor (desktops screenshot OCR analysis), Desktop Control (windows sizing/virtual desktops), Command Line Control (CMD/PowerShell scripts execution).\n"
+    "- REMOTE: Remote Phone Dashboard (LAN dashboard, stream phone microphone, mobile upload dropzone).\n"
+    "- CREATIVE/IOT: CAD Design Agent (OpenSCAD 3D models generation), Smart Home (TP-Link Kasa lights/plugs control), 3D Printer Control (OctoPrint/Moonraker status & job management).\n\n"
     "LUMINA BROWSER ARCHITECTURE:\n"
     "Lumina has a single dedicated Brave browser instance — completely separate from the user's personal Brave.\n"
     "Profile: E:\\LuminaBrowser\\profile | Port: 9223 | Window: 1100x700\n"
@@ -443,6 +468,8 @@ class AudioLoop:
         # If lumina.py is in backend/, project root is one up
         project_root = os.path.dirname(current_dir)
         self.project_manager = ProjectManager(project_root)
+        self._dashboard = None
+        self._phone_active = False
         
         # Initialize Passive Memory Store
         memory_db_path = os.path.join(current_dir, "lumina_memory.db")
@@ -494,10 +521,78 @@ class AudioLoop:
         except Exception as e:
             print(f"[MEMORY SEED] Error seeding owner identity: {e}")
     
+    def _broadcast_log(self, sender, text):
+        if hasattr(self, '_dashboard') and self._dashboard and text.strip():
+            speaker_map = {"User": "user", "Lumina": "jarvis"}
+            spk = speaker_map.get(sender, sender.lower())
+            try:
+                import asyncio
+                from datetime import datetime
+                asyncio.create_task(
+                    self._dashboard.broadcast({
+                        "type": "log",
+                        "speaker": spk,
+                        "text": text,
+                        "ts": datetime.now().isoformat()
+                    })
+                )
+            except Exception as e:
+                print(f"[Dashboard] Broadcast error: {e}")
+
+    def _on_phone_connected(self) -> None:
+        print("[Dashboard] Phone connected via Remote Dashboard.")
+
+    async def _relay_phone_audio(self) -> None:
+        """Forward phone mic PCM chunks from dashboard queue into the Gemini Live session."""
+        if not self._dashboard:
+            return
+        q = self._dashboard._phone_audio_queue
+        while True:
+            try:
+                chunk = await asyncio.wait_for(q.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                # No audio for 1 s → phone mic inactive, give PC mic back
+                self._phone_active = False
+                continue
+            self._phone_active = True   # phone is streaming — silence PC mic
+            if not self.paused:
+                if self.out_queue:
+                    try:
+                        await self.out_queue.put(chunk)
+                    except asyncio.QueueFull:
+                        pass
+
+    async def _process_dashboard_commands(self) -> None:
+        if not self._dashboard:
+            return
+        while True:
+            try:
+                text = await asyncio.wait_for(
+                    self._dashboard._command_queue.get(), timeout=0.5
+                )
+                if not text:
+                    continue
+                # Wait up to 8s for session to become ready
+                for _ in range(80):
+                    if getattr(self, "session", None):
+                        break
+                    await asyncio.sleep(0.1)
+                if getattr(self, "session", None):
+                    await self.session.send(input=text, end_of_turn=True)
+                    print(f"[Dashboard Command Sent]: {text}")
+                else:
+                    print(f"[Dashboard] Dropped command (no session): {text}")
+            except asyncio.TimeoutError:
+                pass
+            except Exception as e:
+                print(f"[Dashboard] Command error: {e}")
+                await asyncio.sleep(0.5)
+
     def flush_chat(self):
         """Forces the current chat buffer to be written to log."""
         if self.chat_buffer["sender"] and self.chat_buffer["text"].strip():
             self.project_manager.log_chat(self.chat_buffer["sender"], self.chat_buffer["text"])
+            self._broadcast_log(self.chat_buffer["sender"], self.chat_buffer["text"])
             self.chat_buffer = {"sender": None, "text": ""}
         # Reset transcription tracking for new turn
         self._last_input_transcription = ""
@@ -653,10 +748,25 @@ class AudioLoop:
                 input_device_index=resolved_input_device_index if resolved_input_device_index is not None else mic_info["index"],
                 frames_per_buffer=CHUNK_SIZE,
             )
+            self._audio_stream_channels = CHANNELS
         except OSError as e:
-            print(f"[LUMINA] [ERR] Failed to open audio input stream: {e}")
-            print("[LUMINA] [WARN] Audio features will be disabled. Please check microphone permissions.")
-            return
+            print(f"[LUMINA] Failed to open mono channel ({CHANNELS}), attempting stereo fallback...")
+            try:
+                self.audio_stream = await asyncio.to_thread(
+                    pya.open,
+                    format=FORMAT,
+                    channels=2,
+                    rate=SEND_SAMPLE_RATE,
+                    input=True,
+                    input_device_index=resolved_input_device_index if resolved_input_device_index is not None else mic_info["index"],
+                    frames_per_buffer=CHUNK_SIZE,
+                )
+                self._audio_stream_channels = 2
+                print("[LUMINA] Stereo input opened successfully. Will downsample to mono.")
+            except OSError as stereo_err:
+                print(f"[LUMINA] [ERR] Failed to open audio input stream: {stereo_err}")
+                print("[LUMINA] [WARN] Audio features will be disabled. Please check microphone permissions.")
+                return
 
         if __debug__:
             kwargs = {"exception_on_overflow": False}
@@ -687,10 +797,18 @@ class AudioLoop:
             try:
                 data = await asyncio.to_thread(self.audio_stream.read, CHUNK_SIZE, **kwargs)
                 
+                # Downsample to mono if stereo stream was opened
+                if getattr(self, '_audio_stream_channels', 1) == 2:
+                    count = len(data) // 4
+                    if count > 0:
+                        shorts = struct.unpack(f"<{count * 2}h", data)
+                        left_channel_shorts = shorts[0::2]  # slice left samples
+                        data = struct.pack(f"<{count}h", *left_channel_shorts)
+
                 # 1. Send Audio (mic gate: drop frames while assistant is speaking)
                 if self.out_queue:
-                    if time.time() < self._mic_gate_until:
-                        pass  # drop mic frame — echo suppression
+                    if time.time() < self._mic_gate_until or getattr(self, '_phone_active', False):
+                        pass  # drop mic frame — echo suppression or phone active
                     else:
                         await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
                 
@@ -983,6 +1101,7 @@ class AudioLoop:
                                             # Flush previous if exists
                                             if self.chat_buffer["sender"] and self.chat_buffer["text"].strip():
                                                 self.project_manager.log_chat(self.chat_buffer["sender"], self.chat_buffer["text"])
+                                                self._broadcast_log(self.chat_buffer["sender"], self.chat_buffer["text"])
                                             # Start new — reset voice nav flag for new utterance
                                             self._voice_nav_handled = False
                                             self.chat_buffer = {"sender": "User", "text": delta}
@@ -1018,6 +1137,7 @@ class AudioLoop:
                                             # Flush previous
                                             if self.chat_buffer["sender"] and self.chat_buffer["text"].strip():
                                                 self.project_manager.log_chat(self.chat_buffer["sender"], self.chat_buffer["text"])
+                                                self._broadcast_log(self.chat_buffer["sender"], self.chat_buffer["text"])
                                             # Start new
                                             self.chat_buffer = {"sender": "Lumina", "text": delta}
                                         else:
@@ -1471,6 +1591,19 @@ class AudioLoop:
                                     )
                                     function_responses.append(function_response)
 
+                                elif fc.name == "navigate_ui":
+                                    panel = fc.args.get("panel", "home")
+                                    print(f"[LUMINA DEBUG] [TOOL] Tool Call: 'navigate_ui' panel='{panel}'")
+                                    if self.on_voice_command:
+                                        self.on_voice_command(panel, "all")
+                                        result_str = f"Successfully navigated interface to panel: {panel}."
+                                    else:
+                                        result_str = f"Navigation failed: UI callback not registered. Cannot switch to {panel}."
+                                    function_response = types.FunctionResponse(
+                                        id=fc.id, name=fc.name, response={"result": result_str}
+                                    )
+                                    function_responses.append(function_response)
+
                                 elif fc.name == "browser_control":
                                     intent = fc.args.get("intent", "")
                                     params_raw = fc.args.get("params", "{}")
@@ -1743,6 +1876,20 @@ class AudioLoop:
          pass
 
     async def run(self, start_message=None):
+        # Hook global main loop reference for run_coroutine
+        import actions
+        actions.main_loop = asyncio.get_running_loop()
+
+        # Load Dashboard server
+        try:
+            from dashboard_routes import get_dashboard_server
+            self._dashboard = get_dashboard_server()
+            if self._dashboard:
+                self._dashboard.set_connect_callback(self._on_phone_connected)
+        except Exception as e:
+            print(f"[Dashboard] Load error: {e}")
+            self._dashboard = None
+
         # ========================================
         # PHASE D.1.c: GEMINI LIVE AUTO-RETRY
         # FIX D: UI-only reconnect, no spoken spam
@@ -1780,6 +1927,12 @@ class AudioLoop:
 
                     tg.create_task(self.send_realtime())
                     tg.create_task(self.listen_audio())
+
+                    # Start dashboard background tasks inside TaskGroup
+                    if self._dashboard:
+                        tg.create_task(self._process_dashboard_commands())
+                        tg.create_task(self._relay_phone_audio())
+                        asyncio.create_task(self._dashboard.broadcast({"type": "status", "state": "active"}))
 
                     if self.video_mode == "camera":
                         tg.create_task(self.get_frames())
@@ -1865,6 +2018,8 @@ class AudioLoop:
                 self.session = None
                 self.is_generating = False
                 self._turn_done.set()
+                if self._dashboard:
+                    asyncio.create_task(self._dashboard.broadcast({"type": "status", "state": "sleeping"}))
                 if hasattr(self, 'audio_stream') and self.audio_stream:
                     try:
                         self.audio_stream.close()

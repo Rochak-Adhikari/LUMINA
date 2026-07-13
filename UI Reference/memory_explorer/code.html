@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina OS - Timeline</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&amp;family=Sora:wght@500;600&amp;family=Geist:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#89f2ff",
+                        "primary": "#a8e8ff",
+                        "inverse-on-surface": "#2f3032",
+                        "secondary-container": "#03b7c5",
+                        "surface-container-highest": "#333537",
+                        "on-background": "#e2e2e4",
+                        "on-secondary-fixed": "#001f23",
+                        "primary-fixed": "#b4ebff",
+                        "on-primary-fixed": "#001f27",
+                        "on-tertiary-fixed": "#161c21",
+                        "surface-container-lowest": "#0d0e10",
+                        "on-secondary-fixed-variant": "#004f56",
+                        "secondary-fixed-dim": "#4bd9e7",
+                        "primary-container": "#00d4ff",
+                        "primary-fixed-dim": "#3cd7ff",
+                        "on-surface-variant": "#bbc9cf",
+                        "on-tertiary-container": "#4a5156",
+                        "on-secondary": "#00363b",
+                        "surface-tint": "#3cd7ff",
+                        "inverse-surface": "#e2e2e4",
+                        "outline-variant": "#3c494e",
+                        "tertiary-fixed": "#dde3ea",
+                        "on-primary-fixed-variant": "#004e5f",
+                        "inverse-primary": "#00677e",
+                        "on-error": "#690005",
+                        "secondary": "#4bd9e7",
+                        "on-secondary-container": "#004248",
+                        "surface-bright": "#38393b",
+                        "on-surface": "#e2e2e4",
+                        "surface-dim": "#121415",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-low": "#1a1c1d",
+                        "surface-container-high": "#282a2c",
+                        "on-primary": "#003642",
+                        "error": "#ffb4ab",
+                        "on-primary-container": "#00586b",
+                        "on-tertiary": "#2b3136",
+                        "tertiary-container": "#bdc3ca",
+                        "on-tertiary-fixed-variant": "#41484d",
+                        "surface-container": "#1e2022",
+                        "tertiary": "#d9dfe6",
+                        "error-container": "#93000a",
+                        "surface-variant": "#333537",
+                        "background": "#121415",
+                        "surface": "#121415",
+                        "tertiary-fixed-dim": "#c1c7ce",
+                        "outline": "#859398"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "stack-sm": "8px",
+                        "stack-lg": "32px",
+                        "stack-md": "16px",
+                        "margin-desktop": "64px",
+                        "margin-mobile": "20px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Manrope"],
+                        "mono-ui": ["Geist"],
+                        "display-lg": ["Sora"],
+                        "headline-md": ["Sora"],
+                        "display-lg-mobile": ["Sora"],
+                        "body-md": ["Manrope"],
+                        "label-sm": ["Geist"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "mono-ui": ["14px", { "lineHeight": "1.4", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "display-lg-mobile": ["32px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "label-sm": ["13px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #030405; /* Level 0 Background */
+            color: #e2e2e4;
+            overflow-x: hidden;
+        }
+        .glass-surface {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .glass-surface:hover {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 40px rgba(168, 232, 255, 0.05); /* Soft primary glow */
+        }
+        .memory-thread {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: linear-gradient(to bottom, transparent, rgba(168, 232, 255, 0.3), transparent);
+            transform: translateX(-50%);
+            z-index: 0;
+        }
+        /* Hide scrollbar for clean aesthetic */
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+        .parallax-element {
+            transition: transform 0.1s ease-out;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen relative flex selection:bg-primary/30 selection:text-primary">
+<!-- TopNavBar -->
+<nav class="bg-transparent fixed top-0 w-full flex justify-between items-center px-margin-desktop py-stack-md z-50 pointer-events-none md:pointer-events-auto">
+<div class="font-display-lg text-display-lg tracking-tighter text-primary">Lumina</div>
+<div class="flex items-center space-x-6 font-mono-ui text-mono-ui">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors duration-300 cursor-pointer active:scale-95 pointer-events-auto">sensors</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors duration-300 cursor-pointer active:scale-95 pointer-events-auto">mic</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors duration-300 cursor-pointer active:scale-95 pointer-events-auto">schedule</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors duration-300 cursor-pointer active:scale-95 pointer-events-auto">settings</span>
+</div>
+</nav>
+<!-- SideNavBar -->
+<nav class="hidden md:flex bg-white/5 fixed left-stack-lg top-1/2 -translate-y-1/2 w-20 rounded-full backdrop-blur-3xl border border-white/10 shadow-[0_0_40px_rgba(60,215,255,0.1)] flex-col items-center py-stack-lg space-y-stack-md z-50">
+<!-- Home -->
+<a class="text-on-surface-variant p-4 hover:bg-white/10 transition-all duration-500 hover:scale-110 active:scale-90 flex flex-col items-center group" href="#">
+<span class="material-symbols-outlined">blur_on</span>
+<span class="font-label-sm text-label-sm mt-1 opacity-0 group-hover:opacity-100 absolute left-full ml-4 bg-surface-container-high px-2 py-1 rounded text-primary">Home</span>
+</a>
+<!-- Intelligence -->
+<a class="text-on-surface-variant p-4 hover:bg-white/10 transition-all duration-500 hover:scale-110 active:scale-90 flex flex-col items-center group" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-label-sm text-label-sm mt-1 opacity-0 group-hover:opacity-100 absolute left-full ml-4 bg-surface-container-high px-2 py-1 rounded text-primary">Intelligence</span>
+</a>
+<!-- Timeline (Active) -->
+<a class="bg-primary-container/20 text-primary rounded-full p-4 shadow-[0_0_15px_rgba(0,212,255,0.3)] hover:bg-white/10 transition-all duration-500 hover:scale-110 active:scale-90 flex flex-col items-center group relative" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">history</span>
+<span class="font-label-sm text-label-sm mt-1 opacity-0 group-hover:opacity-100 absolute left-full ml-4 bg-surface-container-high px-2 py-1 rounded text-primary whitespace-nowrap">Timeline</span>
+</a>
+<!-- Archive -->
+<a class="text-on-surface-variant p-4 hover:bg-white/10 transition-all duration-500 hover:scale-110 active:scale-90 flex flex-col items-center group" href="#">
+<span class="material-symbols-outlined">layers</span>
+<span class="font-label-sm text-label-sm mt-1 opacity-0 group-hover:opacity-100 absolute left-full ml-4 bg-surface-container-high px-2 py-1 rounded text-primary">Archive</span>
+</a>
+</nav>
+<!-- Main Canvas -->
+<main class="flex-1 ml-0 md:ml-32 mt-32 px-margin-mobile md:px-margin-desktop relative pb-32">
+<div class="max-w-6xl mx-auto relative min-h-[1536px]">
+<!-- Thread Line -->
+<div class="memory-thread hidden lg:block"></div>
+<!-- Header -->
+<header class="mb-stack-lg lg:mb-24 text-center lg:text-left relative z-10">
+<h1 class="font-display-lg-mobile md:font-display-lg text-primary mb-2">Memory Timeline</h1>
+<p class="font-body-lg text-on-surface-variant max-w-xl">Exploring fragments, connections, and synthesized thoughts across your atmospheric intelligence ecosystem.</p>
+</header>
+<!-- Timeline Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-stack-lg relative z-10">
+<!-- Memory Node: Conversation (Left side) -->
+<div class="lg:pr-12 lg:text-right flex flex-col lg:items-end parallax-element" data-speed="0.02">
+<div class="font-mono-ui text-mono-ui text-primary/60 mb-2 flex items-center lg:justify-end gap-2">
+<span>OCT 14, 2023</span>
+<span class="w-1 h-1 rounded-full bg-primary/40"></span>
+<span>14:32</span>
+</div>
+<div class="glass-surface rounded-2xl p-6 lg:p-8 w-full max-w-md transition-all duration-500 cursor-pointer group">
+<div class="flex items-center gap-3 mb-4 lg:flex-row-reverse">
+<span class="material-symbols-outlined text-primary/80 group-hover:text-primary transition-colors">forum</span>
+<h3 class="font-headline-md text-on-surface">Project Synthesis</h3>
+</div>
+<p class="font-body-md text-on-surface-variant mb-4 lg:text-right">
+                            Deep dive into the architectural patterns of the new ambient intelligence module. Discussed integration vectors and edge cases.
+                        </p>
+<div class="flex flex-wrap gap-2 lg:justify-end">
+<span class="px-3 py-1 rounded-full bg-white/5 border border-white/10 font-label-sm text-label-sm text-on-surface-variant">#architecture</span>
+<span class="px-3 py-1 rounded-full bg-white/5 border border-white/10 font-label-sm text-label-sm text-on-surface-variant">#synthesis</span>
+</div>
+</div>
+</div>
+<!-- Spacer for right side grid -->
+<div class="hidden lg:block"></div>
+<!-- Spacer for left side grid -->
+<div class="hidden lg:block lg:mt-24"></div>
+<!-- Memory Node: Image/Visual (Right side) -->
+<div class="lg:pl-12 lg:mt-24 flex flex-col parallax-element" data-speed="0.04">
+<div class="font-mono-ui text-mono-ui text-primary/60 mb-2 flex items-center gap-2">
+<span>OCT 12, 2023</span>
+<span class="w-1 h-1 rounded-full bg-primary/40"></span>
+<span>09:15</span>
+</div>
+<div class="glass-surface rounded-2xl p-2 w-full max-w-md transition-all duration-500 cursor-pointer group relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-t from-[#080B0E] to-transparent z-10 pointer-events-none opacity-60"></div>
+<img class="w-full h-64 object-cover rounded-xl opacity-80 group-hover:opacity-100 transition-opacity duration-700" data-alt="A highly detailed cinematic shot of a futuristic data visualization mesh suspended in a dark, minimalist space. The mesh glows with subtle primary cyan tones, reflecting gently off the glossy black floor. The lighting is moody and directional, casting soft environmental shadows. The overall aesthetic is premium, high-tech, and ethereal, fitting perfectly within an advanced atmospheric AI interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOLBqdhd29JLILmY8g3GKDH-2VVv5hxRAQkNP3jN1fXON9z26Ttn5-k5KqjHxmglnbB3hxJxrYS9REOBPll0udqLHc_cmP8bLDt7jHwdgRBOZIMTFJvcrB8vEouYWntAQO226KeTZL68uZtvrpWV7I5JoSRCVkyEJVM1HYu1w0LEgBIbqxRhYVG8it6cLhbaohoFVu-ovjQcSwUvnUxdCAGBx56bVFCb2vSo0tI-P0SqL36J7kvVYW"/>
+<div class="absolute bottom-6 left-6 right-6 z-20">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-primary text-sm">visibility</span>
+<h3 class="font-headline-md text-on-surface">Visual Capture</h3>
+</div>
+<p class="font-body-md text-on-surface-variant/90 line-clamp-1">Reference for the new fluid mesh layout.</p>
+</div>
+</div>
+</div>
+<!-- Memory Node: Insight (Left side) -->
+<div class="lg:pr-12 lg:text-right flex flex-col lg:items-end lg:-mt-12 parallax-element" data-speed="0.03">
+<div class="font-mono-ui text-mono-ui text-primary/60 mb-2 flex items-center lg:justify-end gap-2">
+<span>OCT 10, 2023</span>
+<span class="w-1 h-1 rounded-full bg-primary/40"></span>
+<span>18:45</span>
+</div>
+<div class="glass-surface rounded-2xl p-6 lg:p-8 w-full max-w-sm transition-all duration-500 cursor-pointer group relative">
+<!-- Decorative glow -->
+<div class="absolute -top-10 -left-10 w-32 h-32 bg-primary/10 rounded-full blur-[40px] group-hover:bg-primary/20 transition-all duration-700 pointer-events-none"></div>
+<div class="flex items-center gap-3 mb-4 lg:flex-row-reverse relative z-10">
+<span class="material-symbols-outlined text-secondary-fixed group-hover:animate-pulse">lightbulb</span>
+<h3 class="font-headline-md text-secondary-fixed">Extracted Insight</h3>
+</div>
+<p class="font-body-md text-on-surface relative z-10 lg:text-right italic">
+                            "The key to atmospheric interfaces isn't about adding features, it's about reducing the friction of interaction until the system feels like a natural extension of thought."
+                        </p>
+</div>
+</div>
+<!-- Spacer for right side grid -->
+<div class="hidden lg:block"></div>
+</div>
+</div>
+</main>
+<script>
+        // Simple parallax effect for floating elements
+        document.addEventListener('mousemove', (e) => {
+            const elements = document.querySelectorAll('.parallax-element');
+            const x = (window.innerWidth - e.pageX) / 100;
+            const y = (window.innerHeight - e.pageY) / 100;
+
+            elements.forEach(el => {
+                const speed = el.getAttribute('data-speed') || 0.05;
+                el.style.transform = `translate(${x * speed * 100}px, ${y * speed * 100}px)`;
+            });
+        });
+    </script>
+</body></html>

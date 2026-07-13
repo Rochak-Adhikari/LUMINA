@@ -47,6 +47,7 @@ const SettingsWindow = ({
     const [idleEnabled, setIdleEnabled] = useState(true);
     const [strictSensitivity, setStrictSensitivity] = useState(0.5);
     const [adaptiveMode, setAdaptiveMode] = useState(true);
+    const [remotePairing, setRemotePairing] = useState(null);
     const hasHydratedRef = useRef(false);
 
     useEffect(() => {
@@ -71,17 +72,22 @@ const SettingsWindow = ({
                 if (typeof settings.persona_idle_enabled !== 'undefined') setIdleEnabled(settings.persona_idle_enabled);
                 if (typeof settings.persona_strict_sensitivity !== 'undefined') setStrictSensitivity(settings.persona_strict_sensitivity);
                 if (typeof settings.persona_adaptive_mode !== 'undefined') setAdaptiveMode(settings.persona_adaptive_mode);
+                if (settings.remote_pairing) setRemotePairing(settings.remote_pairing);
                 hasHydratedRef.current = true;
                 console.debug('[SETTINGS] Hydrated from backend:', settings);
             }
         };
 
+        const handleRemoteRevoked = (data) => {
+            alert(`Revoked ${data.count} remote devices successfully.`);
+        };
+
         socket.on('settings', handleSettings);
-        // Also listen for legacy tool_permissions if needed, but 'settings' covers it
-        // socket.on('tool_permissions', handlePermissions); 
+        socket.on('remote_revoked', handleRemoteRevoked);
 
         return () => {
             socket.off('settings', handleSettings);
+            socket.off('remote_revoked', handleRemoteRevoked);
         };
     }, [socket]);
 
@@ -141,6 +147,42 @@ const SettingsWindow = ({
                     </button>
                 </div>
             </div>
+
+            {/* Remote Control Pairing Section */}
+            {remotePairing && (
+                <div className="mb-6 bg-cyan-950/20 border border-cyan-500/20 rounded p-3 text-xs">
+                    <h3 className="text-cyan-400 font-bold mb-2 text-xs uppercase tracking-wider opacity-90 flex justify-between items-center">
+                        <span>Remote Control</span>
+                        <span className="text-[10px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20 font-normal normal-case tracking-normal">Active LAN</span>
+                    </h3>
+                    <p className="text-[10px] text-cyan-200/60 mb-3 leading-relaxed">
+                        Scan the QR code below or visit the LAN URL on your phone to connect mobile mic and control Lumina.
+                    </p>
+                    <div className="flex justify-center mb-3 bg-white p-2 rounded w-36 h-36 mx-auto border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
+                        <img 
+                            src={remotePairing.qr_url} 
+                            alt="Pairing QR Code" 
+                            className="w-full h-full"
+                        />
+                    </div>
+                    <div className="bg-black/40 rounded p-2 border border-cyan-900/40 font-mono text-[10px] space-y-1 mb-3">
+                        <div className="flex justify-between">
+                            <span className="text-cyan-500">Pairing PIN:</span>
+                            <span className="text-cyan-100 font-bold tracking-wider">{remotePairing.pin}</span>
+                        </div>
+                        <div className="flex justify-between truncate">
+                            <span className="text-cyan-500">LAN URL:</span>
+                            <span className="text-cyan-100 font-bold hover:text-cyan-400 cursor-pointer" onClick={() => navigator.clipboard.writeText(remotePairing.url)} title="Copy URL">{remotePairing.manual_url}</span>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => socket.emit('revoke_remote_devices')}
+                        className="w-full py-1 rounded text-[10px] font-bold bg-red-950/40 text-red-400 border border-red-900/30 hover:bg-red-900/20 hover:text-red-300 transition-colors"
+                    >
+                        Revoke All Mobile Devices
+                    </button>
+                </div>
+            )}
 
             {/* Microphone Section */}
             <div className="mb-4">

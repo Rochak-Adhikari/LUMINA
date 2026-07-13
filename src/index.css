@@ -1,8 +1,58 @@
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=Sora:wght@500;600&family=Geist:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-panel:hover {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 60px rgba(168, 232, 255, 0.05);
+}
+
+.glass-level-2 {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-level-3-hover:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 40px rgba(168, 232, 255, 0.05);
+}
+
+.waveform-bar {
+    width: 2px;
+    background-color: #a8e8ff;
+    border-radius: 99px;
+    animation: pulse-wave 1.5s ease-in-out infinite alternate;
+}
+.waveform-bar:nth-child(2) { animation-delay: 0.2s; }
+.waveform-bar:nth-child(3) { animation-delay: 0.4s; }
+.waveform-bar:nth-child(4) { animation-delay: 0.1s; }
+.waveform-bar:nth-child(5) { animation-delay: 0.5s; }
+
+@keyframes pulse-wave {
+    0% { height: 4px; opacity: 0.5; }
+    100% { height: 24px; opacity: 1; }
+}
+
+.float-subtle {
+    animation: float 6s ease-in-out infinite;
+}
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
 
 body {
   margin: 0;

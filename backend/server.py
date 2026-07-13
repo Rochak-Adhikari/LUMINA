@@ -2,6 +2,19 @@ import sys
 import asyncio
 import os
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CRITICAL: Force UTF-8 on stdout/stderr BEFORE any print() runs.
+# Electron spawns the backend with a cp1252 pipe on Windows; without this any
+# print containing → ✓ ✗ — Unicode characters raises UnicodeEncodeError and
+# kills the entire backend. errors="replace" ensures we never crash even on
+# legacy terminals. Guarded for Python <3.7 where reconfigure() is missing.
+# ─────────────────────────────────────────────────────────────────────────────
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 # ========================================
 # CRITICAL: CONDA ENVIRONMENT CHECK
 # ========================================
@@ -56,6 +69,11 @@ memory_engine: MemoryEngine = None
 # Create a Socket.IO server
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 app = FastAPI()
+
+# Register Remote Control Dashboard Routes
+from dashboard_routes import register_dashboard_routes
+register_dashboard_routes(app)
+
 app_socketio = socketio.ASGIApp(sio, app)
 
 # Phase E3: FastAPI shutdown event handler (replaces signal handlers)
@@ -359,6 +377,7 @@ DEFAULT_SETTINGS = {
         "iterate_cad": False,
         "browser_control": True,
         "local_browser_control": False,
+        "youtube_play":    True,
         # ── Phase M: Mark-XXX Integrated Action Tools (all disabled by default) ──
         "cmd_control": False,
         "file_controller": False,
@@ -372,7 +391,6 @@ DEFAULT_SETTINGS = {
         "screen_process": False,
         "desktop_control": False,
         "browser_open":    False,
-        "youtube_control": False,
     },
     "browser_confirmation_mode": "relaxed",
     "persona_enabled": True,
@@ -411,8 +429,13 @@ def load_settings():
             }
             for vk, floor in _VAD_FLOORS.items():
                 if SETTINGS.get(vk, 0) < floor:
-                    print(f"[SETTINGS] Upgrading {vk}: {SETTINGS.get(vk)} → {floor} (floor)")
+                    print(f"[SETTINGS] Upgrading {vk}: {SETTINGS.get(vk)} -> {floor} (floor)")
                     SETTINGS[vk] = floor
+
+            # Strip any deprecated/removed tool keys that may persist in saved JSON
+            _DEPRECATED_TOOLS = {"youtube_control"}
+            for _dt in _DEPRECATED_TOOLS:
+                SETTINGS["tool_permissions"].pop(_dt, None)
 
             print(f"Loaded settings: {SETTINGS}")
         except Exception as e:
@@ -455,11 +478,11 @@ def _reapply_tool_clamp():
     for tool_key in SETTINGS["tool_permissions"].keys():
         if tool_key in _clamp_allowlist:
             if not SETTINGS["tool_permissions"][tool_key]:
-                changed.append(f"{tool_key}: False→True")
+                changed.append(f"{tool_key}: False->True")
             SETTINGS["tool_permissions"][tool_key] = True
         else:
             if SETTINGS["tool_permissions"][tool_key]:
-                changed.append(f"{tool_key}: True→False")
+                changed.append(f"{tool_key}: True->False")
             SETTINGS["tool_permissions"][tool_key] = False
     if changed:
         print(f"[TOOL CLAMP] Re-applied clamp, fixed: {changed}")
@@ -653,6 +676,27 @@ async def startup_event():
 @app.get("/status")
 async def status():
     return {"status": "running", "service": "Lumina Backend"}
+
+from pydantic import BaseModel
+class WhatsAppMessage(BaseModel):
+    text: str
+    sender: str
+
+@app.post("/whatsapp_reply")
+async def whatsapp_reply(msg: WhatsAppMessage):
+    """Generate a Lumina reply for a WhatsApp message received in the UI."""
+    from whatsapp_poller import generate_lumina_reply
+    from google import genai
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return {"reply": "Hey, sorry, API key not configured on backend."}
+    client = genai.Client(http_options={"api_version": "v1beta"}, api_key=api_key)
+    try:
+        reply_text = await generate_lumina_reply(msg.text, msg.sender, client)
+        return {"reply": reply_text}
+    except Exception as e:
+        print(f"[WHATSAPP ENDPOINT] Error generating reply: {e}")
+        return {"reply": "Sry bro, error aayo reply garna... 😅"}
 
 # ========================================
 # Phase T2: Local Browser Control test endpoints
@@ -2081,7 +2125,7 @@ async def user_input(sid, data):
 
             # ---- BUILD PREFIX (compact) ----
             memory_lines = [
-                "[MEMORY] Scepter IS the user. Treat as facts unless contradicted.",
+                "[MEMORY] Scepter IS the user. Treat as facts. DO NOT mention, repeat, or bring up these memories or past chats unless Scepter's message is directly related to them or explicitly asks about them. Keep casual chat focused entirely on the present.",
                 ""
             ]
             _count_identity = 0
@@ -2251,12 +2295,6 @@ async def user_input(sid, data):
     print(f"[TURN] memory_ms={memory_ms} llm_total_ms={llm_total_ms} total_ms={total_turn_ms} socket={socket_status} model={model_status}")
     print(f"[SERVER DEBUG] Message sent to model successfully.")
 
-import json
-from datetime import datetime
-from pathlib import Path
-
-# ... (imports)
-
 @sio.event
 async def video_frame(sid, data):
     # data should contain 'image' which is binary (blob) or base64 encoded
@@ -2297,6 +2335,7 @@ async def save_memory(sid, data):
             for msg in messages:
                 sender = msg.get('sender', 'Unknown')
                 text = msg.get('text', '')
+                f.write(f"[{sender}]: {text}\n")
         print(f"Conversation saved to {filename}")
         await sio.emit('status', {'msg': 'Memory Saved Successfully'})
 
@@ -2334,6 +2373,49 @@ async def upload_memory(sid, data):
     except Exception as e:
         print(f"Error uploading memory: {e}")
         await sio.emit('error', {'msg': f"Failed to upload memory: {str(e)}"})
+
+@sio.event
+async def process_file(sid, data):
+    """Handle file processing requests from the UI (non-memory files)."""
+    import asyncio
+    file_path = data.get('file_path', '').strip()
+    file_name = data.get('file_name', file_path)
+    print(f"[SERVER] Received process_file request: {file_name}")
+
+    if not file_path:
+        await sio.emit('chat_message', {
+            'sender': 'System',
+            'text': 'No file path provided.'
+        }, room=sid)
+        return
+
+    try:
+        from actions import ACTION_REGISTRY
+        if 'file_processor' not in ACTION_REGISTRY:
+            await sio.emit('chat_message', {
+                'sender': 'System',
+                'text': 'File processor not available.'
+            }, room=sid)
+            return
+
+        _fp = ACTION_REGISTRY['file_processor']
+        result = await asyncio.to_thread(
+            _fp,
+            {'file_path': file_path},
+            None,  # response
+            None,  # player
+            None,  # session_memory
+        )
+        await sio.emit('chat_message', {
+            'sender': 'Lumina',
+            'text': f"📄 **{file_name}**\n\n{result}"
+        }, room=sid)
+    except Exception as e:
+        print(f"[SERVER] process_file error: {e}")
+        await sio.emit('chat_message', {
+            'sender': 'System',
+            'text': f"File processing failed: {e}"
+        }, room=sid)
 
 @sio.event
 async def discover_kasa(sid):
@@ -2738,6 +2820,23 @@ async def get_settings(sid):
     payload = dict(SETTINGS)
     payload["_tool_clamp_mode"] = _clamp_mode
     payload["_tool_clamp_allowlist"] = sorted(_clamp_allowlist) if _clamp_allowlist else []
+    
+    # Add remote pairing info if dashboard is available
+    try:
+        from dashboard_routes import get_dashboard_server
+        db = get_dashboard_server()
+        if db:
+            key = db.new_key()
+            url = db.get_url()
+            payload["remote_pairing"] = {
+                "pin": key,
+                "url": url,
+                "qr_url": f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={url}/auto-login?key={key}",
+                "manual_url": db.get_manual_url()
+            }
+    except Exception as e:
+        print(f"[SERVER] Remote pairing info error: {e}")
+
     await sio.emit('settings', payload)
 
 @sio.event
@@ -2798,6 +2897,22 @@ async def update_settings(sid, data):
     payload["_tool_clamp_mode"] = _clamp_mode
     payload["_tool_clamp_allowlist"] = sorted(_clamp_allowlist) if _clamp_allowlist else []
     await sio.emit('settings', payload)
+
+
+@sio.event
+async def revoke_remote_devices(sid):
+    try:
+        from dashboard_routes import get_dashboard_server
+        db = get_dashboard_server()
+        if db:
+            count = len(db._device_sessions)
+            db._device_sessions.clear()
+            db._tokens.clear()
+            db._token_keys.clear()
+            print(f"[SERVER] Revoked {count} remote control devices.")
+            await sio.emit('remote_revoked', {'count': count})
+    except Exception as e:
+        print(f"[SERVER] Error revoking devices: {e}")
 
 
 # Deprecated/Mapped for compatibility if frontend still uses specific events
@@ -3308,7 +3423,7 @@ if __name__ == "__main__":
     
     uvicorn.run(
         "server:app_socketio", 
-        host="127.0.0.1", 
+        host="0.0.0.0", 
         port=8000, 
         reload=False, # Reload enabled causes spawn of worker which might miss the event loop policy patch
         loop="asyncio",

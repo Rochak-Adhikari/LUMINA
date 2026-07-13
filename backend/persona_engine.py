@@ -566,15 +566,34 @@ class PersonaEngine:
         """
         budget = dict(MEMORY_BUDGET)
 
-        # Should we inject session summary this turn?
-        turns_since = self._turn_count - self._last_summary_inject_turn
-        explicit_summary = bool(re.search(r"\b(what were we doing|summarize|summary|recap|where were we)\b", user_text, re.I))
-        inject_summary = explicit_summary or turns_since >= budget["summary_inject_interval"] or self._topic_shifted
+        # Detect casual chat / chitchat (greetings, simple status, idle chat)
+        # We check for technical, project, or memory-recalling keywords. If none are present, it is casual.
+        has_keywords = bool(re.search(
+            r"\b(code|build|project|task|file|folder|dir|repo|git|npm|python|server|run|bug|error|terminal|cmd|powershell|port|"
+            r"remember|memory|recall|forget|preference|history|yesterday|last|previous|past|recap|summary|summarize|remind|alarm|"
+            r"spotify|youtube|weather|flight|game|cad|printer|kasa|light|device|control|open|create|write|read|search|find|list)\b",
+            user_text, re.I
+        ))
+        
+        # If no keywords are matched, or the message is very short (greetings like 'hi', 'yo'), it is casual chat
+        is_casual = not has_keywords or len(user_text.strip()) < 15
+        
+        if is_casual:
+            # Casual chat doesn't need historical context or project clutter
+            budget["max_active_project"] = 0
+            budget["max_excerpts"] = 0
+            budget["inject_summary"] = False
+            inject_summary = False
+        else:
+            # Should we inject session summary this turn?
+            turns_since = self._turn_count - self._last_summary_inject_turn
+            explicit_summary = bool(re.search(r"\b(what were we doing|summarize|summary|recap|where were we)\b", user_text, re.I))
+            inject_summary = explicit_summary or turns_since >= budget["summary_inject_interval"] or self._topic_shifted
 
-        # If topic shifted, reduce project memory
-        if self._topic_shifted:
-            budget["max_active_project"] = 2
-            budget["max_excerpts"] = 3
+            # If topic shifted, reduce project memory
+            if self._topic_shifted:
+                budget["max_active_project"] = 2
+                budget["max_excerpts"] = 3
 
         # Check if user explicitly references archived/completed work
         text_lower = user_text.lower()

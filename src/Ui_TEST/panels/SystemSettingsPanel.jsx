@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const TOOLS = [
     { id: 'generate_cad', label: 'Generate CAD' },
@@ -83,6 +83,8 @@ const SystemSettingsPanel = ({ socket, micDevices, speakerDevices, webcamDevices
     const [idleEnabled, setIdleEnabled] = useState(true);
     const [strictSensitivity, setStrictSensitivity] = useState(50);
     const [adaptiveMode, setAdaptiveMode] = useState(true);
+    const [remotePairing, setRemotePairing] = useState(null);
+    const [pinCopied, setPinCopied] = useState(false);
     const hasHydratedRef = useRef(false);
 
     useEffect(() => {
@@ -101,6 +103,7 @@ const SystemSettingsPanel = ({ socket, micDevices, speakerDevices, webcamDevices
             if (typeof settings.persona_idle_enabled !== 'undefined') setIdleEnabled(settings.persona_idle_enabled);
             if (typeof settings.persona_strict_sensitivity !== 'undefined') setStrictSensitivity(Math.round(settings.persona_strict_sensitivity * 100));
             if (typeof settings.persona_adaptive_mode !== 'undefined') setAdaptiveMode(settings.persona_adaptive_mode);
+            if (settings.remote_pairing) setRemotePairing(settings.remote_pairing);
             hasHydratedRef.current = true;
         };
 
@@ -112,6 +115,24 @@ const SystemSettingsPanel = ({ socket, micDevices, speakerDevices, webcamDevices
         if (!hasHydratedRef.current) return;
         socket.emit('update_settings', payload);
     };
+
+    const refreshPairing = useCallback(() => {
+        // Re-request settings which rotates the PIN
+        socket.emit('get_settings');
+    }, [socket]);
+
+    const copyPin = useCallback(() => {
+        if (!remotePairing?.pin) return;
+        navigator.clipboard.writeText(remotePairing.pin).then(() => {
+            setPinCopied(true);
+            setTimeout(() => setPinCopied(false), 2000);
+        });
+    }, [remotePairing]);
+
+    const revokeDevices = useCallback(() => {
+        socket.emit('revoke_remote_devices');
+        setTimeout(refreshPairing, 300);
+    }, [socket, refreshPairing]);
 
     const isToolClamped = (toolId) => {
         if (clampMode !== 'on') return false;
@@ -246,6 +267,70 @@ const SystemSettingsPanel = ({ socket, micDevices, speakerDevices, webcamDevices
                     >
                         Emergency Kill — Disable All Browser Tools
                     </button>
+                </SectionCard>
+
+                {/* ══════ REMOTE CONTROL ══════ */}
+                <SectionCard title="Remote Control" color="purple">
+                    {remotePairing ? (
+                        <div className="flex flex-col gap-3">
+                            {/* QR Code */}
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="w-[130px] h-[130px] rounded-xl border border-purple-500/30 bg-black/40 overflow-hidden flex items-center justify-center">
+                                    <img
+                                        src={remotePairing.qr_url}
+                                        alt="Pairing QR Code"
+                                        className="w-full h-full object-contain"
+                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                    />
+                                </div>
+                                <p className="text-[10px] text-purple-500/60 tracking-wide text-center">Scan with phone camera</p>
+                            </div>
+
+                            {/* PIN */}
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-cyan-100/80">PIN</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-mono text-base font-bold text-purple-300 tracking-[0.3em]">{remotePairing.pin}</span>
+                                    <button
+                                        onClick={copyPin}
+                                        className="text-[10px] px-2 py-0.5 rounded border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-colors"
+                                    >
+                                        {pinCopied ? 'Copied!' : 'Copy'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* URL */}
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs text-cyan-100/80">LAN Address</span>
+                                <div className="font-mono text-[11px] text-purple-300 bg-black/40 border border-purple-500/20 rounded-lg px-3 py-1.5 break-all select-all">
+                                    {remotePairing.url}
+                                </div>
+                                <p className="text-[9px] text-purple-600 tracking-wide">Type this in your phone browser, then enter the PIN above</p>
+                            </div>
+
+                            {/* Buttons */}
+                            <div className="flex gap-2 pt-1">
+                                <button
+                                    onClick={refreshPairing}
+                                    className="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-medium bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 transition-all"
+                                >
+                                    Refresh PIN
+                                </button>
+                                <button
+                                    onClick={revokeDevices}
+                                    className="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-medium bg-red-900/30 text-red-400 border border-red-700/30 hover:bg-red-800/50 transition-all"
+                                >
+                                    Revoke Devices
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center py-4">
+                            <p className="text-xs text-cyan-600 mb-2">Remote pairing unavailable</p>
+                            <button onClick={refreshPairing} className="text-[11px] px-3 py-1.5 rounded-lg border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-colors">Retry</button>
+                        </div>
+                    )}
                 </SectionCard>
 
                 {/* ══════ SYSTEM ══════ */}

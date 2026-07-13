@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lumina OS - Home</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&amp;family=Sora:wght@500;600&amp;family=Geist:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-fixed": "#89f2ff",
+                    "primary": "#a8e8ff",
+                    "inverse-on-surface": "#2f3032",
+                    "secondary-container": "#03b7c5",
+                    "surface-container-highest": "#333537",
+                    "on-background": "#e2e2e4",
+                    "on-secondary-fixed": "#001f23",
+                    "primary-fixed": "#b4ebff",
+                    "on-primary-fixed": "#001f27",
+                    "on-tertiary-fixed": "#161c21",
+                    "surface-container-lowest": "#0d0e10",
+                    "on-secondary-fixed-variant": "#004f56",
+                    "secondary-fixed-dim": "#4bd9e7",
+                    "primary-container": "#00d4ff",
+                    "primary-fixed-dim": "#3cd7ff",
+                    "on-surface-variant": "#bbc9cf",
+                    "on-tertiary-container": "#4a5156",
+                    "on-secondary": "#00363b",
+                    "surface-tint": "#3cd7ff",
+                    "inverse-surface": "#e2e2e4",
+                    "outline-variant": "#3c494e",
+                    "tertiary-fixed": "#dde3ea",
+                    "on-primary-fixed-variant": "#004e5f",
+                    "inverse-primary": "#00677e",
+                    "on-error": "#690005",
+                    "secondary": "#4bd9e7",
+                    "on-secondary-container": "#004248",
+                    "surface-bright": "#38393b",
+                    "on-surface": "#e2e2e4",
+                    "surface-dim": "#121415",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-low": "#1a1c1d",
+                    "surface-container-high": "#282a2c",
+                    "on-primary": "#003642",
+                    "error": "#ffb4ab",
+                    "on-primary-container": "#00586b",
+                    "on-tertiary": "#2b3136",
+                    "tertiary-container": "#bdc3ca",
+                    "on-tertiary-fixed-variant": "#41484d",
+                    "surface-container": "#1e2022",
+                    "tertiary": "#d9dfe6",
+                    "error-container": "#93000a",
+                    "surface-variant": "#333537",
+                    "background": "#121415",
+                    "surface": "#121415",
+                    "tertiary-fixed-dim": "#c1c7ce",
+                    "outline": "#859398"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "24px",
+                    "stack-sm": "8px",
+                    "stack-lg": "32px",
+                    "stack-md": "16px",
+                    "margin-desktop": "64px",
+                    "margin-mobile": "20px",
+                    "unit": "4px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Manrope"],
+                    "mono-ui": ["Geist"],
+                    "display-lg": ["Sora"],
+                    "headline-md": ["Sora"],
+                    "display-lg-mobile": ["Sora"],
+                    "body-md": ["Manrope"],
+                    "label-sm": ["Geist"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "mono-ui": ["14px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "500"}],
+                    "display-lg-mobile": ["32px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "label-sm": ["13px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        /* Ambient Effects & Animations */
+        body {
+            background-color: #030405; /* Level 0 */
+            color: #e2e2e4;
+        }
+        .glass-level-2 {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .glass-level-3-hover:hover {
+            border-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 40px rgba(168, 232, 255, 0.05); /* Soft primary glow */
+        }
+        
+        .waveform-bar {
+            width: 2px;
+            background-color: #a8e8ff;
+            border-radius: 99px;
+            animation: pulse-wave 1.5s ease-in-out infinite alternate;
+        }
+        .waveform-bar:nth-child(2) { animation-delay: 0.2s; }
+        .waveform-bar:nth-child(3) { animation-delay: 0.4s; }
+        .waveform-bar:nth-child(4) { animation-delay: 0.1s; }
+        .waveform-bar:nth-child(5) { animation-delay: 0.5s; }
+        
+        @keyframes pulse-wave {
+            0% { height: 4px; opacity: 0.5; }
+            100% { height: 24px; opacity: 1; }
+        }
+
+        .float-subtle {
+            animation: float 6s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+    </style>
+</head>
+<body class="min-h-screen overflow-x-hidden font-body-lg text-body-lg flex selection:bg-primary-container selection:text-on-primary-container">
+<!-- Ambient Background Glows -->
+<div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+<div class="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-primary opacity-[0.03] blur-[120px]"></div>
+<div class="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-secondary-fixed opacity-[0.02] blur-[150px]"></div>
+</div>
+<!-- SHARED COMPONENT: TopNavBar -->
+<nav class="fixed top-0 w-full flex justify-between items-center px-margin-desktop py-stack-md z-50 bg-transparent text-primary font-mono-ui text-mono-ui no-shadows pointer-events-none">
+<!-- Brand -->
+<div class="font-display-lg text-display-lg tracking-tighter text-primary pointer-events-auto cursor-pointer active:scale-95 transition-transform">
+            Lumina
+        </div>
+<!-- Trailing Icons -->
+<div class="flex items-center space-x-gutter pointer-events-auto">
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors duration-300 cursor-pointer active:scale-95">
+<span class="material-symbols-outlined">sensors</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors duration-300 cursor-pointer active:scale-95">
+<span class="material-symbols-outlined">mic</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors duration-300 cursor-pointer active:scale-95">
+<span class="material-symbols-outlined">schedule</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors duration-300 cursor-pointer active:scale-95">
+<span class="material-symbols-outlined">settings</span>
+</div>
+</div>
+</nav>
+<!-- SHARED COMPONENT: SideNavBar (Floating Dock) -->
+<!-- Hidden on mobile, fixed left dock on desktop -->
+<nav class="hidden md:flex fixed left-stack-lg top-1/2 -translate-y-1/2 w-20 rounded-full backdrop-blur-3xl border border-white/10 shadow-[0_0_40px_rgba(60,215,255,0.1)] bg-white/5 flex-col items-center py-stack-lg space-y-stack-md z-50 font-label-sm text-label-sm text-primary">
+<!-- Active Tab: Home -->
+<div class="group relative cursor-pointer active:scale-90 transition-all duration-500">
+<div class="bg-primary-container/20 text-primary rounded-full p-4 shadow-[0_0_15px_rgba(0,212,255,0.3)] flex items-center justify-center relative">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">blur_on</span>
+<!-- Tooltip -->
+<div class="absolute left-full ml-4 px-4 py-2 rounded-lg glass-level-2 text-on-surface opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    Home
+                </div>
+</div>
+</div>
+<!-- Inactive Tab: Intelligence -->
+<div class="group relative cursor-pointer hover:scale-110 active:scale-90 transition-all duration-500">
+<div class="text-on-surface-variant p-4 hover:bg-white/10 transition-all duration-500 rounded-full flex items-center justify-center relative">
+<span class="material-symbols-outlined">psychology</span>
+<div class="absolute left-full ml-4 px-4 py-2 rounded-lg glass-level-2 text-on-surface opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    Intelligence
+                </div>
+</div>
+</div>
+<!-- Inactive Tab: Timeline -->
+<div class="group relative cursor-pointer hover:scale-110 active:scale-90 transition-all duration-500">
+<div class="text-on-surface-variant p-4 hover:bg-white/10 transition-all duration-500 rounded-full flex items-center justify-center relative">
+<span class="material-symbols-outlined">history</span>
+<div class="absolute left-full ml-4 px-4 py-2 rounded-lg glass-level-2 text-on-surface opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    Timeline
+                </div>
+</div>
+</div>
+<!-- Inactive Tab: Archive -->
+<div class="group relative cursor-pointer hover:scale-110 active:scale-90 transition-all duration-500">
+<div class="text-on-surface-variant p-4 hover:bg-white/10 transition-all duration-500 rounded-full flex items-center justify-center relative">
+<span class="material-symbols-outlined">layers</span>
+<div class="absolute left-full ml-4 px-4 py-2 rounded-lg glass-level-2 text-on-surface opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    Archive
+                </div>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 min-h-screen relative z-10 md:ml-[140px] pt-[120px] pb-margin-desktop px-margin-mobile md:px-margin-desktop flex flex-col xl:flex-row items-center xl:items-stretch gap-margin-desktop max-w-[1920px] mx-auto w-full">
+<!-- Centerpiece: The Orb & Greeting -->
+<section class="w-full xl:w-[45%] flex flex-col justify-center items-center relative min-h-[614px] xl:min-h-0">
+<!-- 3D Energy Orb Component -->
+<div class="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none z-0">
+<div class="w-[80%] aspect-square max-w-[600px] relative float-subtle">
+<!-- Shaders/3D components must use specific tags per guidelines -->
+<!-- STITCH_THREEJS_START:ANIMATION_2 class="absolute inset-0 w-full h-full rounded-full" -->
+<div class="absolute inset-0 w-full h-full rounded-full" style="display:block;">
+<script src="https://ajax.googleapis.com/ajax/libs/threejs/r125/three.min.js"></script>
+<div id="threejs-container-ANIMATION_2" style="width:100%;height:100%"></div>
+<script>
+(function() {
+  const container = document.getElementById('threejs-container-ANIMATION_2');
+  const devicePixelRatio = window.devicePixelRatio || 1;
+  
+const width = container.clientWidth || window.innerWidth;
+const height = container.clientHeight || window.innerHeight;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+camera.position.z = 5;
+
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+renderer.setSize(width, height);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+container.appendChild(renderer.domElement);
+
+// Colors from Design System
+const primaryAccent = new THREE.Color(0x00D4FF);
+const secondaryAccent = new THREE.Color(0x68F0FF);
+
+// Core Orb
+const coreGeometry = new THREE.SphereGeometry(1.2, 64, 64);
+const coreMaterial = new THREE.MeshPhongMaterial({
+  color: primaryAccent,
+  emissive: primaryAccent,
+  emissiveIntensity: 0.5,
+  transparent: true,
+  opacity: 0.8,
+  shininess: 100,
+});
+const core = new THREE.Mesh(coreGeometry, coreMaterial);
+scene.add(core);
+
+// Inner Glow/Energy
+const innerGeometry = new THREE.SphereGeometry(1.4, 64, 64);
+const innerMaterial = new THREE.MeshStandardMaterial({
+  color: secondaryAccent,
+  transparent: true,
+  opacity: 0.2,
+  wireframe: false,
+});
+const innerOrb = new THREE.Mesh(innerGeometry, innerMaterial);
+scene.add(innerOrb);
+
+// Rotating Rings
+const ringGroup = new THREE.Group();
+scene.add(ringGroup);
+
+const createRing = (radius, tiltX, tiltY, speed) => {
+  const geometry = new THREE.TorusGeometry(radius, 0.02, 16, 100);
+  const material = new THREE.MeshBasicMaterial({ 
+    color: primaryAccent, 
+    transparent: true, 
+    opacity: 0.3 
+  });
+  const ring = new THREE.Mesh(geometry, material);
+  ring.rotation.x = tiltX;
+  ring.rotation.y = tiltY;
+  ring.userData = { speed };
+  ringGroup.add(ring);
+  return ring;
+};
+
+const rings = [
+  createRing(1.8, Math.PI / 4, Math.PI / 6, 0.005),
+  createRing(2.0, -Math.PI / 3, Math.PI / 4, -0.003),
+  createRing(2.2, Math.PI / 2.5, -Math.PI / 5, 0.007)
+];
+
+// Particle System
+const particlesCount = 200;
+const particlesGeometry = new THREE.BufferGeometry();
+const posArray = new Float32Array(particlesCount * 3);
+
+for(let i = 0; i < particlesCount * 3; i++) {
+  posArray[i] = (Math.random() - 0.5) * 6;
+}
+particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+
+const particlesMaterial = new THREE.PointsMaterial({
+  size: 0.03,
+  color: secondaryAccent,
+  transparent: true,
+  opacity: 0.6,
+  blending: THREE.AdditiveBlending
+});
+
+const particleMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+scene.add(particleMesh);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+scene.add(ambientLight);
+
+const pointLight = new THREE.PointLight(primaryAccent, 2, 10);
+pointLight.position.set(2, 2, 2);
+scene.add(pointLight);
+
+// Animation Loop
+const animate = () => {
+  requestAnimationFrame(animate);
+  const time = Date.now() * 0.001;
+
+  // Breathing effect
+  const scale = 1 + Math.sin(time * 0.5) * 0.05;
+  core.scale.set(scale, scale, scale);
+  innerOrb.scale.set(scale * 1.1, scale * 1.1, scale * 1.1);
+  
+  // Rotating rings
+  ringGroup.children.forEach(ring => {
+    ring.rotation.z += ring.userData.speed;
+  });
+
+  // Particle drift
+  particleMesh.rotation.y += 0.001;
+  particleMesh.rotation.x += 0.0005;
+
+  renderer.render(scene, camera);
+};
+
+window.addEventListener('resize', () => {
+  const newWidth = container.clientWidth || window.innerWidth;
+  const newHeight = container.clientHeight || window.innerHeight;
+  camera.aspect = newWidth / newHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(newWidth, newHeight);
+});
+
+animate();
+
+})();
+</script>
+</div>
+<!-- STITCH_THREEJS_END:ANIMATION_2 -->
+<!-- Inner structural glow for depth -->
+<div class="absolute inset-0 rounded-full shadow-[inset_0_0_100px_rgba(168,232,255,0.2)]"></div>
+</div>
+</div>
+<!-- Greeting Overlay -->
+<div class="relative z-10 flex flex-col items-center text-center mt-auto xl:mt-[40%] space-y-stack-md">
+<h1 class="font-headline-md text-headline-md text-on-surface tracking-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+                    Good evening, Julian
+                </h1>
+<!-- AI State & Waveform -->
+<div class="flex items-center space-x-4 bg-[#080B0E]/80 backdrop-blur-md px-6 py-3 rounded-full border border-white/5 shadow-[0_10px_40px_rgba(0,0,0,0.3)]">
+<div class="flex items-center space-x-1 h-6">
+<div class="waveform-bar"></div>
+<div class="waveform-bar"></div>
+<div class="waveform-bar"></div>
+<div class="waveform-bar"></div>
+<div class="waveform-bar"></div>
+</div>
+<span class="font-mono-ui text-mono-ui text-primary tracking-widest uppercase text-xs">Listening...</span>
+</div>
+</div>
+<!-- Conversation Preview -->
+<div class="relative z-10 mt-stack-lg w-full max-w-md mx-auto space-y-stack-sm">
+<div class="glass-level-2 rounded-2xl p-5 border-l-2 border-l-primary/50 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-3 opacity-30 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-primary text-sm">auto_awesome</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2">
+                        I've analyzed the atmospheric data for tomorrow. The light quality will be optimal for your morning walk around 07:45 AM.
+                    </p>
+<div class="mt-3 flex items-center space-x-2">
+<span class="w-2 h-2 rounded-full bg-secondary-fixed-dim"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant opacity-70">Calm Analysis</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Side: Quick Actions & Context -->
+<section class="w-full xl:w-[55%] flex flex-col justify-center space-y-stack-lg z-10">
+<div class="flex justify-between items-end mb-stack-md">
+<h2 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Atmospheric Context</h2>
+<span class="font-mono-ui text-mono-ui text-primary opacity-60">sys.active_modules: 6</span>
+</div>
+<!-- Bento Grid -->
+<div class="grid grid-cols-2 md:grid-cols-3 gap-stack-md md:gap-gutter auto-rows-[140px] md:auto-rows-[180px]">
+<!-- Card 1: Voice (Featured) -->
+<div class="glass-level-2 glass-level-3-hover rounded-2xl p-6 col-span-2 row-span-1 flex flex-col justify-between group cursor-pointer transition-all duration-500 relative overflow-hidden">
+<div class="absolute -right-10 -top-10 w-40 h-40 bg-primary/10 rounded-full blur-[40px] group-hover:bg-primary/20 transition-colors"></div>
+<div class="flex justify-between items-start z-10">
+<span class="material-symbols-outlined text-primary text-3xl group-hover:scale-110 transition-transform">graphic_eq</span>
+<span class="font-mono-ui text-[10px] text-on-surface-variant border border-white/10 rounded-full px-2 py-1">Active</span>
+</div>
+<div class="z-10">
+<h3 class="font-headline-md text-[20px] text-on-surface mb-1">Voice Protocol</h3>
+<p class="font-body-md text-sm text-on-surface-variant opacity-70">Ready for continuous dictation</p>
+</div>
+</div>
+<!-- Card 2: Files -->
+<div class="glass-level-2 glass-level-3-hover rounded-2xl p-6 col-span-1 row-span-1 flex flex-col justify-between group cursor-pointer transition-all duration-500">
+<span class="material-symbols-outlined text-on-surface-variant text-2xl group-hover:text-primary transition-colors">folder_open</span>
+<div>
+<h3 class="font-body-lg text-body-lg text-on-surface">Files</h3>
+<p class="font-mono-ui text-[11px] text-on-surface-variant opacity-50 mt-1">12 indexed today</p>
+</div>
+</div>
+<!-- Card 3: Memory -->
+<div class="glass-level-2 glass-level-3-hover rounded-2xl p-6 col-span-1 row-span-1 flex flex-col justify-between group cursor-pointer transition-all duration-500 relative overflow-hidden">
+<!-- Abstract mesh representation via CSS -->
+<div class="absolute inset-0 bg-gradient-to-br from-secondary-fixed/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<span class="material-symbols-outlined text-secondary-fixed text-2xl group-hover:animate-pulse z-10">psychology</span>
+<div class="z-10">
+<h3 class="font-body-lg text-body-lg text-on-surface">Memory</h3>
+<div class="h-1 w-12 bg-white/10 rounded-full mt-2 overflow-hidden">
+<div class="h-full bg-secondary-fixed w-3/4"></div>
+</div>
+</div>
+</div>
+<!-- Card 4: Browser -->
+<div class="glass-level-2 glass-level-3-hover rounded-2xl p-6 col-span-1 md:col-span-2 row-span-1 flex flex-col justify-between group cursor-pointer transition-all duration-500 bg-[url('placeholder')] bg-cover bg-center" data-alt="Abstract, dark-mode 3D rendering of floating glass spheres and interconnected glowing neural lines in deep space. High-end cinematic lighting with deep blacks, stark whites, and intense primary blue accents. Minimalist, futuristic atmospheric aesthetic representing global connectivity and data streams." style="background-image: linear-gradient(to right, rgba(8,11,14,0.9), rgba(8,11,14,0.4)), url('https://lh3.googleusercontent.com/aida-public/AB6AXuAntVyLMBJYtbwjfYDWAGAP4pMKJrSlP64BUKW6J4y-TSvjgUc1nSFP13KltFKlmOsll4nH_qA-N08QVawJvFGmTVqBu1bLZrgonnc3umUgBnoLKxVSaXH6bOhnk39AEReT_nbXp4_vkUeO98yafvDuvPNLceQLnUV7cBLmQLgBGI_ky7gaOxCIuV-5k0Kuc8hAA5fwNbhNMdiZqcMHcuJqPylbnUzSLPdCNFm5l2JXNZu5rvtnJQDZ');">
+<div class="flex justify-between items-start z-10">
+<span class="material-symbols-outlined text-on-surface text-2xl">public</span>
+</div>
+<div class="z-10">
+<h3 class="font-headline-md text-[20px] text-on-surface mb-1">Global Browser</h3>
+<p class="font-mono-ui text-sm text-primary opacity-90">3 active research threads</p>
+</div>
+</div>
+<!-- Card 5: Computer Control -->
+<div class="glass-level-2 glass-level-3-hover rounded-2xl p-6 col-span-1 row-span-1 flex flex-col justify-between group cursor-pointer transition-all duration-500">
+<span class="material-symbols-outlined text-on-surface-variant text-2xl group-hover:text-primary transition-colors">terminal</span>
+<div>
+<h3 class="font-body-lg text-body-lg text-on-surface">Terminal</h3>
+<p class="font-mono-ui text-[11px] text-on-surface-variant opacity-50 mt-1">Awaiting command</p>
+</div>
+</div>
+<!-- Card 6: Spotify (Integration) -->
+<div class="glass-level-2 glass-level-3-hover rounded-2xl p-5 col-span-1 row-span-1 flex flex-col justify-between group cursor-pointer transition-all duration-500">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-[#1DB954] text-xl">play_circle</span>
+<span class="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wider">Audio</span>
+</div>
+<div>
+<p class="font-body-md text-sm text-on-surface line-clamp-1">Cinematic Ambient</p>
+<p class="font-body-md text-[12px] text-on-surface-variant opacity-60">Playing</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+</body></html>

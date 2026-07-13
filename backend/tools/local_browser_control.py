@@ -482,19 +482,30 @@ class LocalBrowserController:
             self._browser = await self._playwright.chromium.connect_over_cdp(
                 f"http://127.0.0.1:{CDP_PORT}"
             )
-            # Get existing context (the user's real profile)
-            contexts = self._browser.contexts
-            if contexts:
-                self._context = contexts[0]
+            
+            # Find the first target of type "page" (the Electron BrowserView/WebContentsView tab)
+            page_target = None
+            for target in self._browser.targets:
+                if target.type == "page" and "devtools" not in target.url:
+                    page_target = target
+                    break
+                    
+            if page_target:
+                self._page = await page_target.page()
+                self._context = self._page.context
+                logger.info(f"Connected to existing page target: {self._page.url}")
             else:
-                self._context = await self._browser.new_context()
-
-            # Reuse existing page or create one
-            pages = self._context.pages
-            if pages:
-                self._page = pages[-1]  # use most recent tab
-            else:
-                self._page = await self._context.new_page()
+                # Fallback to standard context resolution
+                contexts = self._browser.contexts
+                if contexts:
+                    self._context = contexts[0]
+                else:
+                    self._context = await self._browser.new_context()
+                pages = self._context.pages
+                if pages:
+                    self._page = pages[-1]
+                else:
+                    self._page = await self._context.new_page()
 
             self._connected = True
             title = await self._page.title()

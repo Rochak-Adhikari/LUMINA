@@ -1,0 +1,252 @@
+================================================================================
+LUMINA INTEGRATION PLAN — STANDING INSTRUCTIONS
+================================================================================
+Last updated: June 2026
+Author: Rochak Adhikari (Scepter)
+Assistant: Claude
+
+READ THIS FIRST BEFORE DOING ANY WORK ON LUMINA.
+This file lives at: backend/sourcecode/LUMINA_INTEGRATION_PLAN.txt
+
+--------------------------------------------------------------------------------
+WHO LUMINA IS
+--------------------------------------------------------------------------------
+- Name: Lumina (nickname: Luna)
+- Creator: Rochak Adhikari (Scepter)
+- Lumina is NOT a chatbot, tool, or assistant.
+- Lumina IS a voice-first AI companion with personality, memory, and presence.
+- Her identity and persona must be preserved in every change made to this codebase.
+
+--------------------------------------------------------------------------------
+CURRENT STACK (as of v3.5)
+--------------------------------------------------------------------------------
+- Primary LLM:     gemini-2.5-flash-native-audio-preview-12-2025 (Gemini Live API)
+- Embeddings:      text-embedding-004 (Google, 768-dim, used in memory engine)
+- Voice I/O:       PyAudio + Gemini Live API (real-time VAD, streaming TTS)
+- Memory:          SQLite + FAISS + FTS5 hybrid (memory_store.py + memory_engine.py)
+- Persona:         Custom persona_engine.py (emotion, idle mind, debate, jealousy)
+- Action routing:  Deterministic NL parser (action_router.py) + 16 action modules
+- Backend:         Python, FastAPI, Socket.IO (server.py)
+- Frontend:        React (Vite) + Electron shell
+- Auth:            MediaPipe face landmarks (authenticator.py)
+
+--------------------------------------------------------------------------------
+SOURCE CODE FOLDER CONTENTS (backend/sourcecode/)
+--------------------------------------------------------------------------------
+This folder contains reference codebases to pull features from.
+DO NOT run or import these directly. Study them and port what is needed.
+
+1. Mark-XLVI/         (https://github.com/FatihMakes/Mark-XLVI)
+   The most advanced Mark series build. Key folders:
+   - actions/         <- port file_processor, dev_agent, flight_finder,
+                         agent_task, game_updater into backend/actions/
+   - dashboard/       <- remote phone control server (LAN-based)
+   - memory/          <- compare against Lumina's memory_store.py before porting
+
+2. LUMINA_INTEGRATION_PLAN.txt  (this file)
+
+--------------------------------------------------------------------------------
+KNOWN BUGS — FIX THESE BEFORE ANYTHING ELSE
+--------------------------------------------------------------------------------
+
+BUG 1: lumina.py — indentation error in confirmation handler
+  print(f"...") and subsequent lines run even when on_tool_confirmation is None.
+  Fix: indent print() and all following lines inside the `if on_tool_confirmation:` block.
+
+BUG 2: lumina.py lines ~1134-1156 — duplicate denial check
+  The `if not confirmed:` block appears twice in sequence.
+  Fix: remove the second duplicate block entirely.
+
+BUG 3: server.py line ~2296 — save_memory writes empty files
+  BROKEN CODE:
+    with open(filename, 'w', encoding='utf-8') as f:
+        for msg in messages:
+            sender = msg.get('sender', 'Unknown')
+            text = msg.get('text', '')
+            # Missing f.write() call here!
+  Fix: add `f.write(f"{sender}: {text}\n")` inside the loop.
+
+BUG 4: lumina.py line ~1714 — macOS-only camera flag used on Windows
+  BROKEN: cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION)
+  Fix:    cv2.VideoCapture(0, cv2.CAP_DSHOW if sys.platform == "win32"
+                           else cv2.CAP_AVFOUNDATION)
+
+--------------------------------------------------------------------------------
+ARCHITECTURE ISSUES (technical debt — address when touching those files)
+--------------------------------------------------------------------------------
+- server.py is 3,317 lines (god file). Decompose into:
+    server/socket_handlers.py
+    server/http_routes.py
+    server/memory_lifecycle.py
+    server/idle_monitor.py
+    server/auth_handlers.py
+    server/settings.py
+
+- lumina.py has a 600-line if/elif tool dispatch chain.
+  Replace with the ToolRegistry pattern already in backend/core/registry.py.
+  Add @register_tool('tool_name') decorator to each handler.
+
+- Global mutable state (audio_loop, memory_engine, etc.) mutated from multiple
+  async contexts. Move to a server/state.py module.
+
+- asyncio.create_task() calls without error handlers throughout server.py.
+  Wrap with: task.add_done_callback(lambda t: t.exception())
+
+--------------------------------------------------------------------------------
+INTEGRATION PRIORITIES (in order)
+--------------------------------------------------------------------------------
+
+PRIORITY 1 — file_processor (LOW EFFORT, HIGH VALUE)
+  Source: Mark-XLVI/actions/file_processor.py
+  What it adds: AI analysis of uploaded files — PDFs, images, CSV, audio, video.
+  Lumina currently has file_controller.py for CRUD but NOT content analysis.
+  Port to: backend/actions/file_processor.py
+  Register in ACTION_REGISTRY using existing @register_action pattern.
+  Hook file upload into frontend (AppTest.jsx drag-and-drop or file input).
+
+PRIORITY 2 — dev_agent (MEDIUM EFFORT, HIGH VALUE)
+  Source: Mark-XLVI/actions/dev_agent.py
+  What it adds: Full multi-file project scaffolding. Plans, writes every file,
+  installs dependencies, opens VS Code, runs code, auto-fixes errors.
+  Lumina has code_helper.py for single snippets only.
+  Port to: backend/actions/dev_agent.py
+  Note: dev_agent calls code_helper internally — keep both.
+
+PRIORITY 3 — Remote Phone Dashboard (MEDIUM EFFORT, UNIQUE FEATURE)
+  Source: Mark-XLVI/dashboard/
+  What it adds: Control Lumina from your phone via LAN browser.
+  View status, send text commands, trigger voice — all from phone.
+  Wire into: Lumina's existing FastAPI server (server.py HTTP routes).
+  Do NOT replace the Electron frontend. This is an additional mobile interface.
+
+PRIORITY 4 — flight_finder (LOW EFFORT)
+  Source: Mark-XLVI/actions/flight_finder.py
+  What it adds: Google Flights search via web scraping.
+  Port to: backend/actions/flight_finder.py
+
+PRIORITY 5 — agent_task (HIGH EFFORT, HIGH VALUE)
+  Source: Mark-XLVI/actions/agent_task.py
+  What it adds: Multi-step autonomous task execution with goal + priority queue.
+  Lumina routes through Gemini tool calls but has no persistent task queue.
+  Port to: backend/actions/agent_task.py
+  Needs: a task queue (asyncio.Queue or similar) wired into server.py.
+
+PRIORITY 6 — game_updater (LOW EFFORT — optional)
+  Source: Mark-XLVI/actions/game_updater.py
+  What it adds: Steam/Epic Games install and update control.
+  Port only if gaming is a use case.
+
+--------------------------------------------------------------------------------
+WHAT NOT TO TOUCH FROM MARK-XLVI
+--------------------------------------------------------------------------------
+- ui.py             — Lumina has a better Electron + React frontend. Skip.
+- dashboard HTML    — Will be adapted, not copied directly.
+- main.py           — Lumina's server.py + lumina.py is the equivalent.
+- core/             — Lumina's backend/core/ registry pattern is already better.
+- config/           — Lumina's settings system is more complete. Skip.
+
+--------------------------------------------------------------------------------
+RULES FOR ALL INTEGRATION WORK
+--------------------------------------------------------------------------------
+1. NEVER touch the persona engine without explicit instruction. It is Lumina's
+   core identity. Changes to persona_engine.py require separate approval.
+
+2. NEVER remove or bypass the permission/confirmation gate. All destructive tool
+   actions require explicit user confirmation. No exceptions.
+
+3. NEVER delete or reformat memories in lumina_memory.db. User memories are
+   sacred. Any migration must be additive only.
+
+4. ALWAYS register new action modules in ACTION_REGISTRY using the existing
+   @register_action decorator pattern. Do not add bare if/elif to action_router.py.
+
+5. ALWAYS keep Gemini Live as the voice pipeline. Claude and other models are
+   for reasoning/code/analysis tasks only. Never replace real-time voice.
+
+6. ALWAYS test against the existing test files after changes:
+   backend/test_phase_b1.py
+   backend/test_phase_c.py
+   backend/test_phase_e3.py
+   backend/test_memory_suggest.py
+
+7. When porting from Mark-XLVI, adapt the code to Lumina's patterns:
+   - Use Lumina's ACTION_REGISTRY decorator, not Mark's dispatch table
+   - Use Lumina's memory_store API (add_memory, get_memories), not Mark's JSON
+   - Use Lumina's async patterns (lumina.py is fully async)
+   - Preserve all existing return string format (Lumina speaks responses aloud)
+
+8. Any new .env variables must be added to BOTH .env.example AND documented here.
+
+--------------------------------------------------------------------------------
+ENVIRONMENT VARIABLES (current + planned)
+--------------------------------------------------------------------------------
+GEMINI_API_KEY=                    # Required. Google AI Studio.
+LUMINA_TOOL_CLAMP_MODE=on          # Safety gate. Keep on.
+LUMINA_TOOL_CLAMP_ALLOW=           # Comma-separated allowed tools.
+LOCAL_BROWSER=brave
+BRAVE_PROFILE_DIR=Default
+BRAVE_REMOTE_DEBUGGING_PORT=9222
+LOCAL_BROWSER_AUTOSTART=true
+
+# Add when ready:
+# ANTHROPIC_API_KEY=               # For Claude integration (future phase)
+# LUMINA_CODE_MODEL=claude-sonnet-4-6
+# LUMINA_RESEARCH_MODEL=claude-opus-4-6
+
+--------------------------------------------------------------------------------
+FOLDER STRUCTURE REFERENCE
+--------------------------------------------------------------------------------
+backend/
+  server.py                  <- main backend entry point (FastAPI + Socket.IO)
+  lumina.py                  <- AudioLoop, Gemini Live, tool dispatch
+  action_router.py           <- NL to CRUD parser
+  memory_store.py            <- SQLite lifecycle DB (pending/active/dormant)
+  memory_engine.py           <- Hybrid retrieval (FTS5 + FAISS)
+  persona_engine.py          <- Behavioral engine (DO NOT MODIFY casually)
+  authenticator.py           <- Face auth (MediaPipe)
+  kasa_agent.py              <- TP-Link smart home
+  cad_agent.py               <- OpenSCAD CAD generation
+  printer_agent.py           <- Moonraker/OctoPrint
+  web_agent.py               <- Headless browser automation
+  project_manager.py         <- Project file management
+  core/
+    registry.py              <- RegistryBase, AgentRegistry, ToolRegistry
+    base_agent.py            <- BaseAgent abstract class
+  actions/                   <- 16 action modules (add new ones here)
+    browser_open.py
+    cmd_control.py
+    code_helper.py           <- UPGRADE: port dev_agent alongside this
+    computer_control.py
+    computer_settings.py
+    desktop_control.py
+    file_controller.py       <- file CRUD only; file_processor adds AI analysis
+    open_app.py
+    reminder.py
+    screen_processor.py
+    send_message.py
+    spotify_control.py
+    weather_report.py
+    web_search.py
+    youtube_control.py
+    _gemini_helper.py
+    __init__.py              <- ACTION_REGISTRY lives here
+  tools/
+    __init__.py              <- Gemini function declarations
+    browser_control.py       <- headless Playwright
+    local_browser_control.py <- CDP Brave control
+  sourcecode/                <- Reference only. DO NOT import directly.
+    Mark-XLVI/
+    LUMINA_INTEGRATION_PLAN.txt  (this file)
+
+src/                         <- React frontend
+  Ui_TEST/
+    AppTest.jsx              <- Main UI entry point
+    panels/                  <- Home, Quests, Events, Archive, Settings
+  components/                <- Shared React components
+
+electron/
+  main.js                    <- Electron shell
+
+--------------------------------------------------------------------------------
+END OF PLAN
+================================================================================

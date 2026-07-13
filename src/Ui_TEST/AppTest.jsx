@@ -16,6 +16,8 @@ import KnowledgeArchivePanel from './panels/KnowledgeArchivePanel';
 import EventsPanel from './panels/EventsPanel';
 import QuestsPanel from './panels/QuestsPanel';
 import SystemSettingsPanel from './panels/SystemSettingsPanel';
+import FeaturesPanel from './panels/FeaturesPanel';
+import BrowserWorkspacePanel from './panels/BrowserWorkspacePanel';
 
 const socket = io('http://localhost:8000');
 const { ipcRenderer } = window.require('electron');
@@ -269,6 +271,13 @@ function AppTest() {
     // Mic visualizer
     useEffect(() => { if (selectedMicId) startMicVisualizer(selectedMicId); }, [selectedMicId]);
 
+    // Auto-hide integrated browser views when navigating away from browser workspace
+    useEffect(() => {
+        if (activePanel !== 'browser') {
+            ipcRenderer.send('browser-set-bounds', { visible: false });
+        }
+    }, [activePanel]);
+
     // ========================================
     // HANDLERS — identical to production
     // ========================================
@@ -331,15 +340,26 @@ function AppTest() {
     const handleFileUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const textContent = event.target.result;
-            if (typeof textContent === 'string' && textContent.length > 0) {
-                socket.emit('upload_memory', { memory: textContent });
-                addMessage('System', 'Uploading memory...');
-            }
-        };
-        reader.readAsText(file);
+
+        // Memory files (.txt) → upload as memory (existing behavior)
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (ext === 'txt') {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const textContent = event.target.result;
+                if (typeof textContent === 'string' && textContent.length > 0) {
+                    socket.emit('upload_memory', { memory: textContent });
+                    addMessage('System', 'Uploading memory...');
+                }
+            };
+            reader.readAsText(file);
+        } else {
+            // All other file types → send path for AI file processing
+            // For Electron, file.path gives the absolute path
+            const filePath = file.path || file.name;
+            socket.emit('process_file', { file_path: filePath, file_name: file.name });
+            addMessage('System', `Processing file: ${file.name}...`);
+        }
     };
 
     const startMicVisualizer = async (deviceId) => {
@@ -371,7 +391,6 @@ function AppTest() {
     // Panel navigation
     const navigateToPanel = (panel) => {
         setActivePanel(panel);
-        if (window.innerWidth < 1024) setSidebarOpen(false); // auto-close on small screens
     };
 
     const audioAmp = aiAudioData.reduce((a, b) => a + b, 0) / aiAudioData.length / 255;
@@ -380,220 +399,239 @@ function AppTest() {
     // RENDER
     // ========================================
     return (
-        <div className="h-screen w-screen bg-black text-cyan-100 font-mono overflow-hidden flex flex-col relative selection:bg-cyan-900 selection:text-white">
-            {/* Background layers */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-900 via-black to-black z-0 pointer-events-none" style={{ opacity: 0.6 }} />
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 z-0 pointer-events-none mix-blend-overlay" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-900/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="h-screen w-screen bg-[#030405] text-[#e2e2e4] font-manrope overflow-hidden flex flex-col relative selection:bg-primary-container/20 selection:text-primary">
+            {/* Ambient Background Glows */}
+            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+                <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-primary opacity-[0.03] blur-[120px]" />
+                <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-secondary-fixed opacity-[0.02] blur-[150px]" />
+            </div>
 
-            {/* ============ TOP BAR ============ */}
-            <div className="z-50 flex items-center justify-between p-2 border-b border-cyan-500/20 bg-black/60 backdrop-blur-md select-none shrink-0" style={{ WebkitAppRegion: 'drag' }}>
-                <div className="flex items-center gap-3 pl-2" style={{ WebkitAppRegion: 'no-drag' }}>
-                    {/* Sidebar Toggle */}
-                    <button
-                        onClick={() => setSidebarOpen(!sidebarOpen)}
-                        className="p-1.5 rounded-md border border-cyan-800/40 text-cyan-500 hover:bg-cyan-900/30 hover:border-cyan-500/50 transition-all duration-200"
-                        title="Toggle sidebar"
-                    >
-                        {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-                    </button>
+            {/* ============ TOP NAVIGATION HEADER ============ */}
+            <nav className="fixed top-0 w-full flex justify-between items-center px-margin-desktop py-stack-md z-50 bg-transparent text-primary pointer-events-none" style={{ WebkitAppRegion: 'drag' }}>
+                {/* Brand Logo */}
+                <div 
+                    className="font-sora text-2xl font-semibold tracking-tighter text-primary pointer-events-auto cursor-pointer active:scale-95 transition-transform"
+                    onClick={() => navigateToPanel('home')}
+                    style={{ WebkitAppRegion: 'no-drag' }}
+                >
+                    Lumina
+                </div>
 
-                    <h1 className="text-xl font-bold tracking-[0.2em] text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">
-                        LUMINA
-                    </h1>
-                    <div className="text-[10px] text-cyan-700 border border-cyan-900 px-1 rounded">V2.0.0</div>
-
-                    {/* Connection Status */}
-                    <div className={`text-[10px] px-2 py-0.5 rounded border flex items-center gap-1 ${
-                        connectionStatus === 'connected'
-                            ? 'text-green-400 border-green-500/30 bg-green-500/10'
-                            : connectionStatus === 'reconnecting'
-                            ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10 animate-pulse'
-                            : 'text-red-400 border-red-500/30 bg-red-500/10'
-                    }`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${
-                            connectionStatus === 'connected' ? 'bg-green-400' :
-                            connectionStatus === 'reconnecting' ? 'bg-yellow-400' : 'bg-red-400'
+                {/* Status metrics & Window Controls */}
+                <div className="flex items-center space-x-6 pointer-events-auto" style={{ WebkitAppRegion: 'no-drag' }}>
+                    {/* Connection indicator */}
+                    <div className="flex items-center space-x-2 font-mono-ui text-xs">
+                        <span className={`w-2 h-2 rounded-full ${
+                            connectionStatus === 'connected' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]' :
+                            connectionStatus === 'reconnecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
                         }`} />
-                        <span>{connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'reconnecting' ? 'Reconnecting' : 'Offline'}</span>
+                        <span className="opacity-60 capitalize">{connectionStatus}</span>
                     </div>
 
-                    {/* Power Toggle */}
-                    <button
-                        onClick={togglePower}
-                        className={`p-1.5 rounded-full border transition-all duration-300 ${isConnected
-                            ? 'border-green-500/50 text-green-500 hover:bg-green-500/10 shadow-[0_0_8px_rgba(34,197,94,0.2)]'
-                            : 'border-gray-600/50 text-gray-500 hover:bg-gray-600/10'
-                        }`}
-                    >
-                        <Power size={14} />
-                    </button>
-                </div>
-
-                {/* Center: Mic Visualizer */}
-                <div className="flex-1 flex justify-center mx-4">
-                    <TopAudioBar audioData={micAudioData} />
-                </div>
-
-                {/* Right side */}
-                <div className="flex items-center gap-2 pr-2" style={{ WebkitAppRegion: 'no-drag' }}>
-                    <div className="flex items-center gap-1.5 text-[11px] text-cyan-300/70 font-mono px-2">
-                        <Clock size={12} className="text-cyan-500/50" />
+                    {/* Quick alarm clock */}
+                    <div className="flex items-center space-x-1.5 text-on-surface-variant font-mono-ui text-xs">
+                        <Clock size={14} className="text-primary/50" />
                         <span>{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
 
-                    {/* Settings Icon (top-right) — opens settings panel */}
-                    <button
-                        onClick={() => navigateToPanel(activePanel === 'settings' ? 'home' : 'settings')}
-                        className={`p-1.5 rounded-md border transition-all duration-200 ${activePanel === 'settings'
-                            ? 'border-cyan-400/60 text-cyan-400 bg-cyan-900/20 shadow-[0_0_8px_rgba(34,211,238,0.2)]'
-                            : 'border-cyan-800/40 text-cyan-600 hover:border-cyan-500/50 hover:text-cyan-400'
+                    {/* Mic Toggle */}
+                    <button 
+                        onClick={toggleMute}
+                        disabled={!isConnected}
+                        className={`flex items-center justify-center p-1 rounded transition-colors ${
+                            isMuted ? 'text-red-400 hover:text-red-300' : 'text-primary hover:text-primary-fixed-dim'
                         }`}
-                        title="Settings"
+                        title={isMuted ? 'Unmute' : 'Mute'}
                     >
-                        <Settings size={16} />
+                        {isMuted ? <MicOff size={16} /> : <Mic size={16} />}
                     </button>
 
-                    <button onClick={handleMinimize} className="p-1 hover:bg-cyan-900/50 rounded text-cyan-500 transition-colors"><Minus size={18} /></button>
-                    <button onClick={handleMaximize} className="p-1 hover:bg-cyan-900/50 rounded text-cyan-500 transition-colors"><div className="w-[14px] h-[14px] border-2 border-current rounded-[2px]" /></button>
-                    <button onClick={handleCloseRequest} className="p-1 hover:bg-red-900/50 rounded text-red-500 transition-colors"><X size={18} /></button>
+                    {/* Power Toggle */}
+                    <button 
+                        onClick={togglePower}
+                        className={`flex items-center justify-center p-1 rounded transition-colors ${
+                            isConnected ? 'text-green-400 hover:text-green-300' : 'text-on-surface-variant hover:text-white'
+                        }`}
+                        title={isConnected ? 'Disconnect' : 'Connect'}
+                    >
+                        <Power size={16} />
+                    </button>
+
+                    {/* Window control buttons */}
+                    <div className="flex items-center space-x-1 border-l border-white/10 pl-4">
+                        <button onClick={handleMinimize} className="p-1 hover:bg-white/5 rounded text-on-surface-variant hover:text-white transition-colors"><Minus size={16} /></button>
+                        <button onClick={handleMaximize} className="p-1 hover:bg-white/5 rounded text-on-surface-variant hover:text-white transition-colors"><div className="w-[12px] h-[12px] border border-current rounded-[2px]" /></button>
+                        <button onClick={handleCloseRequest} className="p-1 hover:bg-red-900/40 rounded text-red-500 hover:text-red-400 transition-colors"><X size={16} /></button>
+                    </div>
                 </div>
-            </div>
+            </nav>
 
-            {/* ============ MAIN BODY (sidebar + content) ============ */}
-            <div className="flex-1 flex overflow-hidden relative z-10">
-                {/* Sidebar */}
-                <Sidebar
-                    isOpen={sidebarOpen}
-                    activePanel={activePanel}
-                    onNavigate={navigateToPanel}
-                />
+            {/* ============ SIDEBAR NAVIGATION DOCK ============ */}
+            <Sidebar
+                activePanel={activePanel}
+                onNavigate={navigateToPanel}
+            />
 
-                {/* Main Content Area */}
-                <div className="flex-1 flex flex-col min-w-0 relative">
-                    {/* Panel Content OR Home (Visualizer + Chat) */}
-                    {activePanel === 'home' ? (
-                        <>
-                            {/* Floating Project Label */}
-                            <div className="absolute top-2 left-1/2 -translate-x-1/2 text-cyan-500 text-xs font-mono tracking-widest pointer-events-none z-40 bg-black/50 px-2 py-1 rounded backdrop-blur-sm border border-cyan-500/20">
-                                PROJECT: {currentProject?.toUpperCase()}
-                            </div>
-
-                            {/* Visualizer (centered) */}
-                            <div className="flex-1 flex items-center justify-center relative min-h-0">
-                                <div className="backdrop-blur-xl bg-black/30 border border-white/10 shadow-2xl rounded-2xl overflow-visible relative"
-                                    style={{ width: Math.min(550, typeof window !== 'undefined' ? window.innerWidth * 0.7 : 550), height: 320 }}
-                                >
-                                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none mix-blend-overlay z-10 rounded-2xl" />
-                                    <div className="relative z-20 w-full h-full flex items-center justify-center">
-                                        <Visualizer
-                                            audioData={aiAudioData}
-                                            isListening={isConnected && !isMuted}
-                                            intensity={audioAmp}
-                                            width={Math.min(550, typeof window !== 'undefined' ? window.innerWidth * 0.7 : 550)}
-                                            height={320}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* ============ ANCHORED CHAT (bottom) ============ */}
-                            <div className="shrink-0 border-t border-cyan-500/10 bg-black/50 backdrop-blur-md">
-                                {/* Messages area */}
-                                <div className="max-w-3xl mx-auto px-4 pt-3">
-                                    <div className="flex flex-col gap-2 overflow-y-auto scrollbar-hide mask-image-gradient" style={{ maxHeight: '180px' }}>
-                                        {messages.slice(-8).map((msg, i) => (
-                                            <div key={i} className="text-sm border-l-2 border-cyan-800/50 pl-3 py-1">
-                                                <span className="text-cyan-600 font-mono text-xs opacity-70">[{msg.time}]</span>{' '}
-                                                <span className="font-bold text-cyan-300 drop-shadow-sm">{msg.sender}</span>
-                                                <div className="text-gray-300 mt-0.5 leading-relaxed">{msg.text}</div>
-                                            </div>
-                                        ))}
-                                        <div ref={messagesEndRef} />
-                                    </div>
-                                </div>
-
-                                {/* Input row */}
-                                <div className="max-w-3xl mx-auto px-4 pb-3 pt-2">
-                                    <div className="flex gap-2 items-center">
-                                        <input
-                                            type="text"
-                                            value={inputValue}
-                                            onChange={(e) => setInputValue(e.target.value)}
-                                            onKeyDown={handleSendKey}
-                                            placeholder="Type a message..."
-                                            className="flex-1 bg-black/40 border border-cyan-700/30 rounded-lg px-4 py-2.5 text-cyan-50 text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all placeholder-cyan-800/50 backdrop-blur-sm"
-                                        />
-
-                                        {/* Mic Button */}
-                                        <button
-                                            onClick={toggleMute}
-                                            disabled={!isConnected}
-                                            className={`p-2.5 rounded-lg border transition-all duration-300 ${!isConnected
-                                                ? 'border-gray-800 text-gray-800 cursor-not-allowed'
-                                                : isMuted
-                                                    ? 'border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]'
-                                                    : 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.15)]'
-                                            }`}
-                                            title={isMuted ? 'Unmute mic' : 'Mute mic'}
-                                        >
-                                            {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
-                                        </button>
-
-                                        {/* Send Button */}
-                                        <button
-                                            onClick={handleSendClick}
-                                            disabled={!inputValue.trim()}
-                                            className={`p-2.5 rounded-lg border transition-all duration-300 ${inputValue.trim()
-                                                ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.15)]'
-                                                : 'border-gray-800/50 text-gray-700 cursor-not-allowed'
-                                            }`}
-                                            title="Send message"
-                                        >
-                                            <Send size={18} />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    ) : (
-                        /* Panel views */
-                        <div className="flex-1 overflow-y-auto scrollbar-hide">
-                            {activePanel === 'archive' && <KnowledgeArchivePanel socket={socket} />}
-                            {activePanel === 'events' && <EventsPanel socket={socket} />}
-                            {activePanel === 'quests' && <QuestsPanel socket={socket} />}
-                            {activePanel === 'settings' && (
-                                <SystemSettingsPanel
-                                    socket={socket}
-                                    micDevices={micDevices}
-                                    speakerDevices={speakerDevices}
-                                    webcamDevices={webcamDevices}
-                                    selectedMicId={selectedMicId}
-                                    setSelectedMicId={setSelectedMicId}
-                                    selectedSpeakerId={selectedSpeakerId}
-                                    setSelectedSpeakerId={setSelectedSpeakerId}
-                                    selectedWebcamId={selectedWebcamId}
-                                    setSelectedWebcamId={setSelectedWebcamId}
-                                    cursorSensitivity={cursorSensitivity}
-                                    setCursorSensitivity={setCursorSensitivity}
-                                    isCameraFlipped={isCameraFlipped}
-                                    setIsCameraFlipped={setIsCameraFlipped}
-                                    handleFileUpload={handleFileUpload}
-                                />
-                            )}
+            {/* ============ MAIN CONTENT AREA ============ */}
+            <main className="flex-1 min-h-screen relative z-10 ml-0 md:ml-[130px] pt-[120px] pb-8 px-8 flex flex-col w-full max-w-[1920px] mx-auto overflow-hidden">
+                {/* Switch view between Home Dashboard and panel overlays */}
+                {activePanel === 'home' ? (
+                    <div className="flex-1 flex flex-col items-center justify-between w-full max-w-xl mx-auto py-4 min-h-[560px]">
+                        {/* Project tracking Label */}
+                        <div className="font-mono text-xs tracking-widest text-primary/60 uppercase">
+                            PROJECT: {currentProject || 'Default'}
                         </div>
-                    )}
-                </div>
-            </div>
 
-            {/* ============ OVERLAYS ============ */}
+                        {/* Centerpiece visualizer orb */}
+                        <div className="w-full max-w-[320px] aspect-square flex items-center justify-center relative float-subtle">
+                            <Visualizer
+                                audioData={aiAudioData}
+                                isListening={isConnected && !isMuted}
+                                intensity={audioAmp}
+                                width={300}
+                                height={300}
+                            />
+                            <div className="absolute inset-0 rounded-full shadow-[inset_0_0_60px_rgba(168,232,255,0.1)] pointer-events-none" />
+                        </div>
+
+                        {/* VAD / State Wave indicator */}
+                        <div className="flex items-center space-x-3 bg-[#080B0E]/80 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/5 shadow-xl">
+                            <div className="flex items-center space-x-1 h-5">
+                                <div className="waveform-bar"></div>
+                                <div className="waveform-bar"></div>
+                                <div className="waveform-bar"></div>
+                                <div className="waveform-bar"></div>
+                                <div className="waveform-bar"></div>
+                            </div>
+                            <span className="font-mono text-xs tracking-widest text-primary uppercase">
+                                {isConnected ? (isMuted ? 'Muted' : 'Listening...') : 'Offline'}
+                            </span>
+                        </div>
+
+                        {/* Transcript timeline logs preview */}
+                        <div className="w-full h-[140px] overflow-y-auto scrollbar-hide space-y-2 py-1 mask-image-gradient">
+                            {messages.slice(-4).map((msg, i) => (
+                                <div 
+                                    key={i} 
+                                    className={`glass-level-2 rounded-xl p-3 border-l-2 relative overflow-hidden transition-all duration-300 ${
+                                        msg.sender === 'You' ? 'border-l-primary/70' : 'border-l-secondary-fixed/70'
+                                    }`}
+                                >
+                                    <div className="flex justify-between items-center text-[10px] text-on-surface-variant opacity-60 font-mono">
+                                        <span>{msg.sender}</span>
+                                        <span>{msg.time}</span>
+                                    </div>
+                                    <p className="font-manrope text-xs text-on-surface mt-0.5 leading-relaxed">
+                                        {msg.text}
+                                    </p>
+                                </div>
+                            ))}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Floating bottom voice/text controller with integrated Mic button */}
+                        <div className="w-full flex gap-2 items-center bg-white/5 border border-white/10 rounded-full px-4 py-2.5 backdrop-blur-md shadow-2xl mt-2">
+                            <input
+                                type="text"
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                onKeyDown={handleSendKey}
+                                placeholder="Type a command or ask Luna anything..."
+                                className="flex-1 bg-transparent border-0 outline-none text-white text-xs placeholder-on-surface-variant/40 focus:ring-0"
+                            />
+
+                            {/* File Attachments selector */}
+                            <label className="p-2 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-primary transition-colors cursor-pointer" title="Process file">
+                                <input type="file" onChange={handleFileUpload} className="hidden" />
+                                <span className="material-symbols-outlined text-[18px]">attach_file</span>
+                            </label>
+
+                            {/* Integrated Mic Button inside chat row */}
+                            <button
+                                onClick={toggleMute}
+                                disabled={!isConnected}
+                                className={`p-2 rounded-full border transition-all duration-300 ${
+                                    !isConnected
+                                        ? 'border-transparent text-on-surface-variant/20'
+                                        : isMuted
+                                            ? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 shadow-[0_0_8px_rgba(239,68,68,0.15)]'
+                                            : 'border-primary-container/30 bg-primary-container/10 text-primary hover:bg-primary-container/20 shadow-[0_0_8px_rgba(6,182,212,0.15)]'
+                                }`}
+                                title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                            >
+                                {isMuted ? <MicOff size={14} /> : <Mic size={14} />}
+                            </button>
+
+                            {/* Send Button */}
+                            <button
+                                onClick={handleSendClick}
+                                disabled={!inputValue.trim()}
+                                className={`p-2 rounded-full border transition-all duration-300 ${
+                                    inputValue.trim()
+                                        ? 'border-primary-container/40 bg-primary-container/20 text-primary hover:scale-105 shadow-[0_0_8px_rgba(6,182,212,0.15)]'
+                                        : 'border-transparent text-on-surface-variant/20'
+                                }`}
+                            >
+                                <Send size={14} />
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    /* Render other navigation overlays/panels */
+                    <div className={`flex-1 relative z-10 w-full mx-auto ${
+                        activePanel === 'browser' ? 'h-[calc(100vh-160px)] overflow-hidden' : 'overflow-y-auto scrollbar-hide pb-12 max-w-[1400px]'
+                    }`}>
+                        {activePanel === 'browser' && (
+                            <BrowserWorkspacePanel
+                                socket={socket}
+                                aiAudioData={aiAudioData}
+                                isConnected={isConnected}
+                                isMuted={isMuted}
+                                messages={messages}
+                                toggleMute={toggleMute}
+                                handleSendClick={handleSendClick}
+                                handleSendKey={handleSendKey}
+                                inputValue={inputValue}
+                                setInputValue={setInputValue}
+                                messagesEndRef={messagesEndRef}
+                                audioAmp={audioAmp}
+                            />
+                        )}
+                        {activePanel === 'archive' && <KnowledgeArchivePanel socket={socket} />}
+                        {activePanel === 'events' && <EventsPanel socket={socket} />}
+                        {activePanel === 'quests' && <QuestsPanel socket={socket} />}
+                        {activePanel === 'features' && <FeaturesPanel />}
+                        {activePanel === 'settings' && (
+                            <SystemSettingsPanel
+                                socket={socket}
+                                micDevices={micDevices}
+                                speakerDevices={speakerDevices}
+                                webcamDevices={webcamDevices}
+                                selectedMicId={selectedMicId}
+                                setSelectedMicId={setSelectedMicId}
+                                selectedSpeakerId={selectedSpeakerId}
+                                setSelectedSpeakerId={setSelectedSpeakerId}
+                                selectedWebcamId={selectedWebcamId}
+                                setSelectedWebcamId={setSelectedWebcamId}
+                                cursorSensitivity={cursorSensitivity}
+                                setCursorSensitivity={setCursorSensitivity}
+                                isCameraFlipped={isCameraFlipped}
+                                setIsCameraFlipped={setIsCameraFlipped}
+                                handleFileUpload={handleFileUpload}
+                            />
+                        )}
+                    </div>
+                )}
+            </main>
+
+            {/* ============ MODAL WINDOW OVERLAYS ============ */}
             {/* CAD Window */}
             {showCadWindow && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="w-[480px] h-[480px] backdrop-blur-xl bg-black/60 border border-cyan-500/20 shadow-2xl rounded-2xl overflow-hidden flex flex-col">
-                        <div className="h-8 bg-gray-900/80 border-b border-cyan-500/20 flex items-center justify-between px-3 shrink-0">
-                            <span className="text-xs font-bold tracking-widest text-cyan-500/70">CAD PROTOTYPE</span>
-                            <button onClick={() => setShowCadWindow(false)} className="text-gray-400 hover:text-red-400 p-1 rounded transition-colors">✕</button>
+                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+                    <div className="w-[520px] h-[520px] backdrop-blur-2xl bg-black/60 border border-cyan-500/20 shadow-2xl rounded-2xl overflow-hidden flex flex-col">
+                        <div className="h-10 bg-black/80 border-b border-cyan-500/25 flex items-center justify-between px-4 shrink-0">
+                            <span className="font-mono text-xs font-bold tracking-widest text-primary">CAD PROTOTYPER VIEW</span>
+                            <button onClick={() => setShowCadWindow(false)} className="text-on-surface-variant hover:text-red-400 text-sm transition-colors">✕</button>
                         </div>
                         <div className="flex-1 min-h-0">
                             <CadWindow data={cadData} thoughts={cadThoughts} retryInfo={cadRetryInfo} onClose={() => setShowCadWindow(false)} socket={socket} />
@@ -604,24 +642,24 @@ function AppTest() {
 
             {/* Browser Window */}
             {showBrowserWindow && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="w-[600px] h-[420px] backdrop-blur-xl bg-black/60 border border-cyan-500/20 shadow-2xl rounded-2xl overflow-hidden">
+                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+                    <div className="w-[700px] h-[480px] backdrop-blur-2xl bg-black/60 border border-cyan-500/20 shadow-2xl rounded-2xl overflow-hidden">
                         <BrowserWindow imageSrc={browserData.image} logs={browserData.logs} onClose={() => setShowBrowserWindow(false)} socket={socket} />
                     </div>
                 </div>
             )}
 
-            {/* Tool Confirmation */}
+            {/* Tool Action Confirmation Popup */}
             <ConfirmationPopup request={confirmationRequest} onConfirm={handleConfirmTool} onDeny={handleDenyTool} />
 
             {/* Reminder Alarm Overlay */}
             {alarmEvent && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-pulse-slow">
-                    <div className="relative w-[420px] bg-gradient-to-br from-gray-900 via-gray-950 to-black border-2 border-amber-500/60 rounded-2xl shadow-[0_0_40px_rgba(245,158,11,0.2)] p-6 text-center">
-                        <div className="text-5xl mb-3">⏰</div>
-                        <h2 className="text-xl font-bold text-amber-300 tracking-wider mb-2">REMINDER</h2>
-                        <p className="text-lg text-white font-semibold mb-1">{alarmEvent.title}</p>
-                        {alarmEvent.notes && <p className="text-sm text-gray-400 mb-4">{alarmEvent.notes}</p>}
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md animate-pulse-slow">
+                    <div className="relative w-[440px] bg-gradient-to-br from-[#0c0d10] via-[#121415] to-[#0d0e10] border-2 border-amber-500/50 rounded-2xl shadow-[0_0_50px_rgba(245,158,11,0.25)] p-6 text-center">
+                        <div className="text-5xl mb-4">⏰</div>
+                        <h2 className="font-sora text-xl font-semibold text-amber-300 tracking-wider mb-2">REMINDER ALERT</h2>
+                        <p className="font-body-lg text-lg text-white font-bold mb-1">{alarmEvent.title}</p>
+                        {alarmEvent.notes && <p className="font-manrope text-sm text-on-surface-variant/70 mb-4">{alarmEvent.notes}</p>}
                         <button
                             onClick={() => {
                                 socket.emit('reminder_alarm_dismissed', {
@@ -631,7 +669,7 @@ function AppTest() {
                                 });
                                 setAlarmEvent(null);
                             }}
-                            className="mt-3 px-6 py-2 bg-amber-500/20 border border-amber-500/50 text-amber-300 rounded-lg hover:bg-amber-500/30 transition-colors text-sm font-bold tracking-wider"
+                            className="mt-2 px-8 py-2.5 bg-amber-500/10 border border-amber-500/40 text-amber-300 rounded-full hover:bg-amber-500/20 transition-all text-xs font-bold tracking-widest"
                         >
                             DISMISS
                         </button>

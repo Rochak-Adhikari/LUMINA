@@ -122,18 +122,157 @@ def _cdp_reachable() -> bool:
         return False
 
 
+# URL substrings that strongly indicate active media playback. Used by the
+# tab-reuse guard to avoid clobbering a tab the user is currently listening to
+# or watching. Conservative on purpose: only well-known media URLs.
+_MEDIA_URL_SUBSTRINGS = (
+    "youtube.com/watch",        # YT video page
+    "music.youtube.com",        # YT Music (any path; usually has playback)
+    "open.spotify.com/track/",  # Spotify track
+    "open.spotify.com/episode/",
+    "open.spotify.com/album/",
+    "open.spotify.com/playlist/",
+    "netflix.com/watch",
+    "primevideo.com/detail",
+    "soundcloud.com/",          # SoundCloud (broad; rare false positives)
+)
+
+
+def _is_likely_media_tab(url: str) -> bool:
+    """Heuristic: does this URL indicate the tab is likely playing media?
+
+    URL-only check by design — fast (no extra CDP roundtrip) and stable.
+    False positives only cost an extra new tab; false negatives interrupt
+    playback, so the substring list is restricted to clear-cut media pages.
+    """
+    if not url:
+        return False
+    u = url.lower()
+    return any(p in u for p in _MEDIA_URL_SUBSTRINGS)
+
+
+def _try_navigate_active_tab(url: str) -> bool:
+    """
+    Navigate a reusable Lumina browser tab in-place via raw CDP WebSocket.
+
+    Reuse-first policy with media-state guard:
+      1. If the most-recently-active page is NOT playing media → navigate it.
+      2. If it IS likely playing media → skip it and try the next non-media,
+         non-devtools page.
+      3. If every reusable page is a media tab → return False so the caller
+         opens the URL in a new tab, preserving playback.
+
+    Uses only Python stdlib — no external WebSocket libraries required.
+
+    Media detection is URL-based (see `_is_likely_media_tab`). True playback
+    state via the Media Session API would require an extra CDP round-trip
+    per page; the URL heuristic covers the common cases (YouTube, Spotify,
+    Netflix) with negligible overhead.
+    """
+    import json as _json, base64, socket, struct, os as _os
+
+    try:
+        r = urllib.request.urlopen(
+            f"http://127.0.0.1:{_LUMINA_CDP_PORT}/json", timeout=2
+        )
+        pages = _json.loads(r.read())
+        r.close()
+    except Exception:
+        return False
+
+    # Candidates: real page tabs only (no devtools, no service workers).
+    reusable = [
+        p for p in pages
+        if p.get("type") == "page"
+        and "devtools" not in p.get("url", "").lower()
+    ]
+    if not reusable:
+        return False
+
+    # Prefer the first non-media page; fall through to None if every tab
+    # appears to be a media tab (caller will open a fresh tab).
+    target = next(
+        (p for p in reusable if not _is_likely_media_tab(p.get("url", ""))),
+        None,
+    )
+    if not target:
+        print(f"[BrowserOpen] All reusable tabs are media tabs — opening new tab to preserve playback")
+        return False
+
+    ws_url = target.get("webSocketDebuggerUrl", "")
+    if not ws_url:
+        return False
+
+    # Parse  ws://host:port/path
+    ws_path = ws_url.replace("ws://", "").replace("wss://", "")
+    slash = ws_path.find("/")
+    hostport = ws_path[:slash] if slash >= 0 else ws_path
+    path = ws_path[slash:] if slash >= 0 else "/"
+    host, _, port_str = hostport.partition(":")
+    port = int(port_str) if port_str else 80
+
+    ws_key = base64.b64encode(_os.urandom(16)).decode()
+    handshake = (
+        f"GET {path} HTTP/1.1\r\n"
+        f"Host: {hostport}\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        f"Sec-WebSocket-Key: {ws_key}\r\n"
+        "Sec-WebSocket-Version: 13\r\n"
+        "\r\n"
+    )
+
+    try:
+        s = socket.create_connection((host, port), timeout=5)
+        s.sendall(handshake.encode())
+
+        buf = b""
+        while b"\r\n\r\n" not in buf:
+            chunk = s.recv(512)
+            if not chunk:
+                break
+            buf += chunk
+
+        if b"101" not in buf:
+            s.close()
+            return False
+
+        payload = _json.dumps(
+            {"id": 1, "method": "Page.navigate", "params": {"url": url}}
+        ).encode("utf-8")
+        mask = _os.urandom(4)
+        length = len(payload)
+        if length < 126:
+            header = bytes([0x81, 0x80 | length])
+        else:
+            header = bytes([0x81, 0xFE]) + struct.pack(">H", length)
+        frame = header + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+        s.sendall(frame)
+
+        s.settimeout(2)
+        try:
+            s.recv(512)
+        except Exception:
+            pass
+        s.close()
+        print(f"[BrowserOpen] Reused active tab -> {url}")
+        return True
+    except Exception as e:
+        print(f"[BrowserOpen] Tab reuse via CDP failed: {e}")
+        return False
+
+
 def _open_in_lumina_browser(url: str) -> bool:
     """
-    Open a URL in Lumina's dedicated Brave browser instance.
+    Open a URL in Lumina's dedicated Brave browser (reuse-first policy).
 
     Strategy:
     1. If Lumina's browser is already running (CDP reachable on port 9223):
-       Open a new tab in it via 'brave.exe --app=<url>' targeting the
-       same profile — Brave detects the running instance and opens a new tab.
+       a. Navigate the active tab in-place via CDP WebSocket (reuse, no new tab).
+       b. If that fails, fall back to launching a new tab via subprocess.
     2. If not running: launch the dedicated Lumina browser with this URL.
 
-    NEVER uses os.startfile, NEVER opens in personal Brave, NEVER uses
-    the default system browser association.
+    NEVER uses os.startfile, NEVER opens in personal Brave.
     """
     if not os.path.isfile(_BRAVE_EXE):
         print(f"[BrowserOpen] Brave not found at {_BRAVE_EXE}")
@@ -143,9 +282,11 @@ def _open_in_lumina_browser(url: str) -> bool:
 
     try:
         if _cdp_reachable():
-            # Lumina browser is already running — open URL as a new tab.
-            # Brave detects the profile is already in use and opens a new tab
-            # in the existing window rather than launching a second instance.
+            # Prefer in-place navigation — reuse the active tab
+            if _try_navigate_active_tab(url):
+                return True
+            # CDP navigation failed — fall back to new tab in existing window
+            print(f"[BrowserOpen] Tab reuse unavailable, opening new tab")
             cmd = [
                 _BRAVE_EXE,
                 f"--user-data-dir={_LUMINA_PROFILE}",
@@ -153,7 +294,7 @@ def _open_in_lumina_browser(url: str) -> bool:
                 url,
             ]
         else:
-            # Lumina browser not running — launch it with this URL
+            # Lumina browser not running — launch it fresh with this URL
             cmd = [
                 _BRAVE_EXE,
                 f"--remote-debugging-port={_LUMINA_CDP_PORT}",
