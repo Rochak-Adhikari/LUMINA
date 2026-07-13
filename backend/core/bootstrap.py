@@ -21,6 +21,12 @@ from brain.events import InProcessEventBus
 from core.context import ExecutionContextFactory
 from core.pipeline import PipelineBuilder, RequestPipeline
 from core.adapters import BrainStateAdapter, EventBusAdapter, ExecutionContextAdapter, PipelineAdapter
+from core.metadata import (
+    ServiceMetadata,
+    ServiceMetadataRegistry,
+    LIFECYCLE_INSTANCE,
+    LIFECYCLE_TRANSIENT,
+)
 
 
 class Bootstrapper:
@@ -43,6 +49,7 @@ class Bootstrapper:
         self.brain_state_adapter: Optional[BrainStateAdapter] = None
         self.event_bus_adapter: Optional[EventBusAdapter] = None
         self.pipeline_adapter: Optional[PipelineAdapter] = None
+        self.metadata_registry: Optional[ServiceMetadataRegistry] = None
 
     def bootstrap(self) -> None:
         """Construct and register all services owned by this bootstrapper."""
@@ -52,6 +59,7 @@ class Bootstrapper:
         self._register_execution_context_factory()
         self._register_pipeline()
         self._register_adapters()
+        self._register_service_metadata()
 
     def _register_smart_home_agent(self) -> None:
         if self._kasa_agent is not None:
@@ -121,3 +129,62 @@ class Bootstrapper:
             lambda: ExecutionContextAdapter(self.context_factory.create()),
         )
         print("[DI] ExecutionContextAdapter registered (transient)")
+
+    def _register_service_metadata(self) -> None:
+        """
+        Populate a ServiceMetadataRegistry describing the infrastructure
+        services registered above, and register the registry itself into
+        the container.
+
+        This is descriptive/introspection data only (Phase 1.8). It does
+        not change how any service is registered or resolved.
+        """
+        registry = ServiceMetadataRegistry()
+        records = [
+            ServiceMetadata(
+                name="BrainState", key=repr(IBrainState),
+                lifecycle=LIFECYCLE_INSTANCE, owner="Phase 1.2",
+                description="Single thread-safe source of runtime truth.",
+            ),
+            ServiceMetadata(
+                name="EventBus", key=repr(IEventBus),
+                lifecycle=LIFECYCLE_INSTANCE, owner="Phase 1.2",
+                description="In-process publish/subscribe event bus.",
+            ),
+            ServiceMetadata(
+                name="ExecutionContextFactory", key=repr(ExecutionContextFactory),
+                lifecycle=LIFECYCLE_INSTANCE, owner="Phase 1.4",
+                description="Factory for immutable execution contexts.",
+            ),
+            ServiceMetadata(
+                name="RequestPipeline", key=repr(IPipeline),
+                lifecycle=LIFECYCLE_INSTANCE, owner="Phase 1.5",
+                description="Sealed, ordered middleware execution pipeline.",
+            ),
+            ServiceMetadata(
+                name="BrainStateAdapter", key=repr(BrainStateAdapter),
+                lifecycle=LIFECYCLE_INSTANCE, owner="Phase 1.6",
+                description="Pass-through adapter over IBrainState.",
+            ),
+            ServiceMetadata(
+                name="EventBusAdapter", key=repr(EventBusAdapter),
+                lifecycle=LIFECYCLE_INSTANCE, owner="Phase 1.6",
+                description="Pass-through adapter over IEventBus.",
+            ),
+            ServiceMetadata(
+                name="PipelineAdapter", key=repr(PipelineAdapter),
+                lifecycle=LIFECYCLE_INSTANCE, owner="Phase 1.6",
+                description="Pass-through adapter over IPipeline.",
+            ),
+            ServiceMetadata(
+                name="ExecutionContextAdapter", key=repr(ExecutionContextAdapter),
+                lifecycle=LIFECYCLE_TRANSIENT, owner="Phase 1.6",
+                description="Per-request pass-through adapter over an execution context.",
+            ),
+        ]
+        for record in records:
+            registry.register(record)
+
+        self.metadata_registry = registry
+        self._container.register_instance(ServiceMetadataRegistry, registry)
+        print(f"[DI] ServiceMetadataRegistry registered ({len(registry)} records)")

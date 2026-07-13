@@ -531,6 +531,10 @@ _request_pipeline = _bootstrapper.pipeline  # Phase 1.5 — not connected to any
 _brain_state_adapter = _bootstrapper.brain_state_adapter
 _event_bus_adapter = _bootstrapper.event_bus_adapter
 _pipeline_adapter = _bootstrapper.pipeline_adapter
+# Phase 1.8 — final infrastructure layer; RuntimeFacade + metadata, not wired into runtime
+_service_metadata_registry = _bootstrapper.metadata_registry
+from core.runtime_facade import RuntimeFacade
+_runtime_facade = RuntimeFacade(container)
 
 
 # ========================================
