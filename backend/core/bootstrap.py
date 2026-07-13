@@ -20,6 +20,7 @@ from brain.state import BrainState
 from brain.events import InProcessEventBus
 from core.context import ExecutionContextFactory
 from core.pipeline import PipelineBuilder, RequestPipeline
+from core.adapters import BrainStateAdapter, EventBusAdapter, ExecutionContextAdapter, PipelineAdapter
 
 
 class Bootstrapper:
@@ -39,6 +40,9 @@ class Bootstrapper:
         self.event_bus: Optional[InProcessEventBus] = None
         self.context_factory: Optional[ExecutionContextFactory] = None
         self.pipeline: Optional[RequestPipeline] = None
+        self.brain_state_adapter: Optional[BrainStateAdapter] = None
+        self.event_bus_adapter: Optional[EventBusAdapter] = None
+        self.pipeline_adapter: Optional[PipelineAdapter] = None
 
     def bootstrap(self) -> None:
         """Construct and register all services owned by this bootstrapper."""
@@ -47,6 +51,7 @@ class Bootstrapper:
         self._register_event_bus()
         self._register_execution_context_factory()
         self._register_pipeline()
+        self._register_adapters()
 
     def _register_smart_home_agent(self) -> None:
         if self._kasa_agent is not None:
@@ -83,3 +88,36 @@ class Bootstrapper:
         self.pipeline = builder.build()
         self._container.register_instance(IPipeline, self.pipeline)
         print("[DI] IPipeline -> RequestPipeline registered (sealed, no middleware)")
+
+    def _register_adapters(self) -> None:
+        """
+        Register thin pass-through adapters alongside the legacy/concrete
+        services they wrap.
+
+        These do NOT replace the existing IBrainState/IEventBus/IPipeline
+        registrations above — they are registered under their own
+        concrete adapter types so both resolution paths coexist. Nothing
+        in the current runtime resolves these types yet.
+
+        ExecutionContextAdapter has no single long-lived instance to wrap
+        (execution contexts are per-request), so it is registered as a
+        transient: each resolve() wraps a fresh root context from
+        ExecutionContextFactory.
+        """
+        self.brain_state_adapter = BrainStateAdapter(self.brain_state)
+        self._container.register_instance(BrainStateAdapter, self.brain_state_adapter)
+        print("[DI] BrainStateAdapter registered")
+
+        self.event_bus_adapter = EventBusAdapter(self.event_bus)
+        self._container.register_instance(EventBusAdapter, self.event_bus_adapter)
+        print("[DI] EventBusAdapter registered")
+
+        self.pipeline_adapter = PipelineAdapter(self.pipeline)
+        self._container.register_instance(PipelineAdapter, self.pipeline_adapter)
+        print("[DI] PipelineAdapter registered")
+
+        self._container.register_transient(
+            ExecutionContextAdapter,
+            lambda: ExecutionContextAdapter(self.context_factory.create()),
+        )
+        print("[DI] ExecutionContextAdapter registered (transient)")

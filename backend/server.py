@@ -527,6 +527,10 @@ _brain_state = _bootstrapper.brain_state
 _event_bus = _bootstrapper.event_bus
 _context_factory = _bootstrapper.context_factory
 _request_pipeline = _bootstrapper.pipeline  # Phase 1.5 — not connected to any runtime path yet
+# Phase 1.6 — thin adapters coexisting beside legacy globals; unused by any runtime path yet
+_brain_state_adapter = _bootstrapper.brain_state_adapter
+_event_bus_adapter = _bootstrapper.event_bus_adapter
+_pipeline_adapter = _bootstrapper.pipeline_adapter
 
 
 # ========================================
