@@ -469,3 +469,33 @@ class IEventBus(ABC):
     @abstractmethod
     async def unsubscribe(self, token: Any) -> None:
         """Remove a subscription by its token."""
+
+
+# ===========================================================================
+# IExecutionContext
+# Owned by: caller (created via ExecutionContextFactory)
+# Used by:  any subsystem that wants typed request/unit-of-work identifiers
+# Implemented by: core/context.py::ExecutionContext
+# ===========================================================================
+
+class IExecutionContext(ABC):
+    """
+    Interface for an immutable execution-context value object.
+
+    Implementors:  ExecutionContext (backend/core/context.py)
+
+    Carries identifiers for a single unit of work (request, tool call,
+    background task) so callers can trace it and its descendants without
+    reaching into globals. Concrete field access is implementation detail;
+    this interface only guarantees the ability to derive a child context.
+    """
+
+    @abstractmethod
+    def child(self, **overrides: Any) -> "IExecutionContext":
+        """
+        Derive a new child context for sub-work spawned by this context.
+
+        The child keeps the parent's correlation_id (for end-to-end
+        tracing) but gets its own context_id and records parent_id.
+        Any keyword override replaces the corresponding inherited field.
+        """

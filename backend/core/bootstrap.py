@@ -18,6 +18,7 @@ from core.container import DependencyContainer
 from core.interfaces import IBrainState, IEventBus, ISmartHomeAgent
 from brain.state import BrainState
 from brain.events import InProcessEventBus
+from core.context import ExecutionContextFactory
 
 
 class Bootstrapper:
@@ -35,12 +36,14 @@ class Bootstrapper:
         self._kasa_agent = kasa_agent
         self.brain_state: Optional[BrainState] = None
         self.event_bus: Optional[InProcessEventBus] = None
+        self.context_factory: Optional[ExecutionContextFactory] = None
 
     def bootstrap(self) -> None:
         """Construct and register all services owned by this bootstrapper."""
         self._register_smart_home_agent()
         self._register_brain_state()
         self._register_event_bus()
+        self._register_execution_context_factory()
 
     def _register_smart_home_agent(self) -> None:
         if self._kasa_agent is not None:
@@ -58,3 +61,8 @@ class Bootstrapper:
         self.event_bus = InProcessEventBus()
         self._container.register_instance(IEventBus, self.event_bus)
         print("[DI] IEventBus -> InProcessEventBus registered")
+
+    def _register_execution_context_factory(self) -> None:
+        self.context_factory = ExecutionContextFactory()
+        self._container.register_instance(ExecutionContextFactory, self.context_factory)
+        print("[DI] ExecutionContextFactory registered")

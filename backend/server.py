@@ -525,6 +525,7 @@ _app_host.start()
 
 _brain_state = _bootstrapper.brain_state
 _event_bus = _bootstrapper.event_bus
+_context_factory = _bootstrapper.context_factory
 
 
 # ========================================
