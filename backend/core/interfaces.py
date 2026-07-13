@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Awaitable, Callable, Dict, Generator, List, Optional
 
 
 # ===========================================================================
@@ -499,3 +499,70 @@ class IExecutionContext(ABC):
         tracing) but gets its own context_id and records parent_id.
         Any keyword override replaces the corresponding inherited field.
         """
+
+
+# ===========================================================================
+# IPipelineMiddleware
+# Owned by: whoever registers it (via IPipeline.register)
+# Used by:  IPipeline.execute()
+# Implemented by: core/middleware.py::PipelineMiddleware (base only — no
+#                 concrete middleware exists yet; see Phase 1.5 scope notes)
+# ===========================================================================
+
+class IPipelineMiddleware(ABC):
+    """
+    Interface for a single pipeline middleware step.
+
+    Implementors:  PipelineMiddleware (backend/core/middleware.py)
+
+    A middleware receives the current pipeline context and a `call_next`
+    callable that invokes the rest of the chain. It is responsible for
+    calling `call_next(context)` itself if it wants downstream middleware
+    to run (standard chain-of-responsibility / ASGI-style middleware).
+    """
+
+    @abstractmethod
+    async def handle(
+        self,
+        context: Any,
+        call_next: Callable[[Any], Awaitable[Any]],
+    ) -> Any:
+        """
+        Process *context*, optionally calling `await call_next(context)` to
+        continue the chain. Returns the (possibly transformed) context.
+        """
+
+
+# ===========================================================================
+# IPipeline
+# Owned by: Bootstrapper (constructed once at startup, immutable after)
+# Used by:  (future phases — not connected to any runtime path yet)
+# Implemented by: core/pipeline.py::RequestPipeline
+# ===========================================================================
+
+class IPipeline(ABC):
+    """
+    Interface for a generic, ordered middleware execution pipeline.
+
+    Implementors:  RequestPipeline (backend/core/pipeline.py)
+
+    Pure infrastructure: registers middleware, runs them in order, and
+    nothing else. No business logic, routing, or domain knowledge belongs
+    here or in any implementation of this interface.
+    """
+
+    @abstractmethod
+    def register(self, middleware: IPipelineMiddleware) -> None:
+        """Append a middleware to the end of the execution chain."""
+
+    @abstractmethod
+    def remove(self, middleware: IPipelineMiddleware) -> None:
+        """Remove a previously-registered middleware from the chain."""
+
+    @abstractmethod
+    async def execute(self, context: Any) -> Any:
+        """Run *context* through the full middleware chain in order."""
+
+    @abstractmethod
+    def clear(self) -> None:
+        """Remove all registered middleware."""

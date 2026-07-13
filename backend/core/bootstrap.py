@@ -15,10 +15,11 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from core.container import DependencyContainer
-from core.interfaces import IBrainState, IEventBus, ISmartHomeAgent
+from core.interfaces import IBrainState, IEventBus, IPipeline, ISmartHomeAgent
 from brain.state import BrainState
 from brain.events import InProcessEventBus
 from core.context import ExecutionContextFactory
+from core.pipeline import PipelineBuilder, RequestPipeline
 
 
 class Bootstrapper:
@@ -37,6 +38,7 @@ class Bootstrapper:
         self.brain_state: Optional[BrainState] = None
         self.event_bus: Optional[InProcessEventBus] = None
         self.context_factory: Optional[ExecutionContextFactory] = None
+        self.pipeline: Optional[RequestPipeline] = None
 
     def bootstrap(self) -> None:
         """Construct and register all services owned by this bootstrapper."""
@@ -44,6 +46,7 @@ class Bootstrapper:
         self._register_brain_state()
         self._register_event_bus()
         self._register_execution_context_factory()
+        self._register_pipeline()
 
     def _register_smart_home_agent(self) -> None:
         if self._kasa_agent is not None:
@@ -66,3 +69,17 @@ class Bootstrapper:
         self.context_factory = ExecutionContextFactory()
         self._container.register_instance(ExecutionContextFactory, self.context_factory)
         print("[DI] ExecutionContextFactory registered")
+
+    def _register_pipeline(self) -> None:
+        """
+        Build and seal a RequestPipeline via PipelineBuilder.
+
+        No middleware is registered — Phase 1.5 establishes the
+        infrastructure only. The pipeline is fully built and immutable by
+        the time this method returns; nothing in the existing runtime
+        path resolves or calls it.
+        """
+        builder = PipelineBuilder()
+        self.pipeline = builder.build()
+        self._container.register_instance(IPipeline, self.pipeline)
+        print("[DI] IPipeline -> RequestPipeline registered (sealed, no middleware)")
