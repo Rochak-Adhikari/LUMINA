@@ -503,51 +503,28 @@ else:
 # tool_permissions is now SETTINGS["tool_permissions"]
 
 # ========================================
-# PHASE 1.1: DI CONTAINER WIRING
-# Register existing concrete objects behind their interfaces.
-# This does NOT change any runtime behaviour — concrete objects are
-# constructed exactly as before.  Container wiring adds a resolution
-# path for future callers that depend on interfaces instead of concretions.
+# PHASE 1.3: APPLICATION LIFECYCLE
+# ApplicationHost + Bootstrapper own service construction and container
+# wiring that previously lived inline here. This does NOT change any
+# runtime behaviour — the same objects are constructed, in the same order,
+# and registered under the same interfaces as before.
+#
+# IMemoryManager and IWorkspaceManager are owned by AudioLoop (lumina.py)
+# and are registered lazily once AudioLoop is constructed in start_audio();
+# Bootstrapper does not own that registration.
 # ========================================
 from core.container import container
-from core.interfaces import ISmartHomeAgent, IMemoryManager, IWorkspaceManager
+from core.interfaces import ISmartHomeAgent, IMemoryManager, IWorkspaceManager, IBrainState, IEventBus
+from core.bootstrap import Bootstrapper
+from core.application import ApplicationHost
 
-# ISmartHomeAgent — kasa_agent may be None when smart devices are disabled.
-# We only register if the agent was actually created; callers that resolve
-# ISmartHomeAgent when it is unavailable will receive a KeyError and should
-# handle it gracefully.
-if kasa_agent is not None:
-    container.register_instance(ISmartHomeAgent, kasa_agent)
-    print("[DI] ISmartHomeAgent → KasaAgent registered")
-else:
-    print("[DI] ISmartHomeAgent — skipped (Kasa tools disabled)")
+_bootstrapper = Bootstrapper(container=container, kasa_agent=kasa_agent)
+_app_host = ApplicationHost(container=container, bootstrapper=_bootstrapper)
+_app_host.initialize()
+_app_host.start()
 
-# IMemoryManager and IWorkspaceManager are owned by AudioLoop (lumina.py).
-# They are registered lazily via _register_audio_loop_services() which is
-# called from start_audio() after AudioLoop is fully constructed.
-# See _register_audio_loop_services() below.
-
-# ========================================
-# PHASE 1.2: BRAIN STATE + EVENT BUS
-# Construct and register BrainState and InProcessEventBus at server
-# startup.  These objects coexist alongside all existing legacy globals;
-# no existing behaviour is changed.
-# ========================================
-from core.interfaces import IBrainState, IEventBus
-from brain.state import BrainState
-from brain.events import InProcessEventBus
-
-# BrainState — single source of runtime truth.
-# Constructed here so it is available before AudioLoop starts.
-_brain_state = BrainState()
-container.register_instance(IBrainState, _brain_state)
-print("[DI] IBrainState → BrainState registered")
-
-# InProcessEventBus — lightweight in-process pub/sub.
-# Registered as a singleton so all subsystems share the same bus.
-_event_bus = InProcessEventBus()
-container.register_instance(IEventBus, _event_bus)
-print("[DI] IEventBus → InProcessEventBus registered")
+_brain_state = _bootstrapper.brain_state
+_event_bus = _bootstrapper.event_bus
 
 
 # ========================================
