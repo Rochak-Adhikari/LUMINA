@@ -55,6 +55,18 @@ class EventBusAdapter(IEventBus):
     async def unsubscribe(self, token: Any) -> None:
         await self._event_bus.unsubscribe(token)
 
+    def publish_sync(self, topic: str, payload: dict, priority: str = "MEDIUM") -> None:
+        self._event_bus.publish_sync(topic, payload, priority)
+
+    def subscribe_sync(self, topic: str, callback: Any) -> Any:
+        return self._event_bus.subscribe_sync(topic, callback)
+
+    def unsubscribe_sync(self, token: Any) -> None:
+        self._event_bus.unsubscribe_sync(token)
+
+    def get_status(self) -> Any:
+        return self._event_bus.get_status()
+
 
 class ExecutionContextAdapter(IExecutionContext):
     """

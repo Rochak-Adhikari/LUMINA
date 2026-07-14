@@ -1,11 +1,16 @@
 """
-core/services.py — Lumina V2 Service Resolution Helpers (Phase 1.7)
+core/services.py — Lumina V2 Service Resolution Helpers (Phase 1.7 + Phase 3)
 
 A single, centralized set of strongly typed accessors for resolving
 services from the DependencyContainer. This module exists only to reduce
-future coupling: once runtime code is migrated (a later phase), it should
-call `get_brain_state()` instead of `container.resolve(IBrainState)`
-directly, so the resolution call site is centralized in one place.
+future coupling: runtime code calls `get_brain_state()` instead of
+`container.resolve(IBrainState)` directly, so the resolution call site
+is centralized in one place.
+
+Phase 3 additions:
+  - get_knowledge_manager()  — IKnowledgeManager resolution
+  - get_session_manager()    — SessionManager resolution
+  - get_service_accessor()   — ServiceAccessor resolution
 
 This module does NOT:
   - cache anything (every call resolves fresh from the container; caching
@@ -17,15 +22,12 @@ This module does NOT:
 Each accessor is a one-line wrapper: `container.resolve(SomeType)`. The
 container parameter defaults to the process-level `container` singleton
 (core/container.py) but can be overridden for testing.
-
-Nothing in the existing runtime path calls these accessors yet — this is
-infrastructure only, matching the scope of Phase 1.6's adapters.
 """
 
 from __future__ import annotations
 
 from core.container import DependencyContainer, container as _default_container
-from core.interfaces import IBrainState, IEventBus, IPipeline, IMemoryManager, IWorkspaceManager
+from core.interfaces import IBrainState, IEventBus, IPipeline, IMemoryManager, IWorkspaceManager, IKnowledgeManager
 from core.context import ExecutionContextFactory
 from core.adapters import (
     BrainStateAdapter,
@@ -43,6 +45,11 @@ def get_memory_manager(c: DependencyContainer = _default_container) -> IMemoryMa
 def get_workspace_manager(c: DependencyContainer = _default_container) -> IWorkspaceManager:
     """Resolve the registered IWorkspaceManager implementation."""
     return c.resolve(IWorkspaceManager)
+
+
+def get_knowledge_manager(c: DependencyContainer = _default_container) -> IKnowledgeManager:
+    """Resolve the registered IKnowledgeManager implementation."""
+    return c.resolve(IKnowledgeManager)
 
 
 def get_brain_state(c: DependencyContainer = _default_container) -> IBrainState:
@@ -92,3 +99,18 @@ def get_execution_context_adapter(
     adapter wrapping a new root ExecutionContext.
     """
     return c.resolve(ExecutionContextAdapter)
+
+
+# ---- Phase 3 Session & Service Accessor resolvers ----------------------
+
+def get_session_manager(c: DependencyContainer = _default_container):
+    """Resolve the registered SessionManager."""
+    from core.session import SessionManager
+    return c.resolve(SessionManager)
+
+
+def get_service_accessor(c: DependencyContainer = _default_container):
+    """Resolve the registered ServiceAccessor."""
+    from core.service_accessor import ServiceAccessor
+    return c.resolve(ServiceAccessor)
+

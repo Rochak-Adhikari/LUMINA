@@ -1,27 +1,33 @@
 """
-core/runtime_facade.py — Lumina V2 Runtime Facade (Phase 1.8)
+core/runtime_facade.py — Lumina V2 Runtime Facade (Phase 1.8 + Phase 3)
 
 A single, centralized, strongly typed access point for the infrastructure
-services built in Phases 1.2–1.7. Where Phase 1.7's core/services.py
-provides free-function accessors, RuntimeFacade bundles them behind one
-object that future runtime code can hold a reference to instead of
-reaching into the container (or into legacy globals) directly.
+services built in Phases 1.2–1.7 and extended in Phase 3.  Where Phase 1.7's
+core/services.py provides free-function accessors, RuntimeFacade bundles them
+behind one object that runtime code holds a reference to instead of reaching
+into the container (or into legacy globals) directly.
+
+Phase 3 additions:
+  - knowledge_manager: IKnowledgeManager accessor
+  - session_manager: SessionManager accessor
+  - service_accessor: ServiceAccessor accessor
 
 This facade:
   - performs no caching (delegates every call to core/services.py, which
     delegates to the container)
   - contains no business logic, no AI/planner/memory/routing logic
   - manages no lifecycle
-  - is NOT wired into any runtime path in this phase
-
-It exists purely to complete the architecture: Phase 2 code can depend on
-RuntimeFacade rather than on concrete service construction.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from core.container import DependencyContainer, container as _default_container
-from core.interfaces import IBrainState, IEventBus, IPipeline, IMemoryManager, IWorkspaceManager
+from core.interfaces import (
+    IBrainState, IEventBus, IPipeline, IMemoryManager,
+    IWorkspaceManager, IKnowledgeManager,
+)
 from core.context import ExecutionContextFactory
 from core.adapters import (
     BrainStateAdapter,
@@ -70,6 +76,23 @@ class RuntimeFacade:
     def workspace_manager(self) -> IWorkspaceManager:
         return services.get_workspace_manager(self._container)
 
+    @property
+    def knowledge_manager(self) -> IKnowledgeManager:
+        """Resolve the registered IKnowledgeManager implementation."""
+        return services.get_knowledge_manager(self._container)
+
+    # ---- Phase 3: Session & Service Accessor ----------------------------
+
+    @property
+    def session_manager(self) -> Any:
+        """Resolve the registered SessionManager."""
+        return services.get_session_manager(self._container)
+
+    @property
+    def service_accessor(self) -> Any:
+        """Resolve the registered ServiceAccessor."""
+        return services.get_service_accessor(self._container)
+
     # ---- Adapters ------------------------------------------------------
 
     @property
@@ -92,3 +115,4 @@ class RuntimeFacade:
         construction explicit at the call site.
         """
         return services.get_execution_context_adapter(self._container)
+

@@ -1,145 +1,106 @@
-# Lumina Core Architecture
+# Lumina V2 Core Architecture Specification
 
-> **Version**: 2.0.0  
-> **Status**: FROZEN  
-> **Last Updated**: February 2025
+> **Version**: 2.2.0  
+> **Status**: ARCHITECTURALLY FROZEN  
+> **Last Updated**: July 2026  
+> **Target Branch**: `refactor/interfaces-and-di`
 
 ---
 
-## System Identity
+## 1. System Identity & Boundaries
+
+Lumina is a private conversational AI companion designed for voice-first interactions. It is built to operate under strict architectural boundaries to preserve system security, performance stability, and role focus.
 
 | Property | Value |
-|----------|-------|
+|---|---|
 | **Name** | Lumina |
 | **Nickname** | Luna |
 | **Creator** | Scepter (Rochak Adhikari) |
-| **Role** | Long-term AI companion |
+| **Role** | Conversational AI Companion |
+| **Primary Language** | Modern colloquial Nepali (`ne-NP`) with natural English code-switching |
 
-**Lumina is NOT:**
-- A chatbot
-- A tool
-- An assistant
-- An autonomous agent
-
-**Lumina IS:**
-- A conversational companion
-- A voice-first AI presence
-- A personality with memory of context
+### Architectural Guardrails
+* **No Direct OS Manipulation**: Core conversation engines are decoupled from hardware/OS. All device commands route deterministic requests through structured interfaces.
+* **Passive Memory Storage**: Memory engines store contextual facts, user preferences, and summaries, but do not autonomously initiate actions or alter software pathways.
+* **Single Active Turn**: A strict state-lock prevents parallel turn generation, suppressing duplicate voice streams and eliminating race conditions.
 
 ---
 
-## Lumina Core Responsibilities
+## 2. Structural Layer Overview
 
-Lumina Core is the central orchestration layer. It is responsible for **conversation flow only**.
-
-### ✅ Lumina Core OWNS
-
-| Responsibility | Description |
-|----------------|-------------|
-| **Conversation Orchestration** | Managing the flow of dialogue between user and AI |
-| **Voice Pipeline Coordination** | Coordinating STT → LLM → TTS handoffs |
-| **Persona & Tone Control** | Maintaining consistent personality and language style |
-| **Session Context** | Tracking conversation state within a session |
-| **LLM Interaction** | Sending prompts and receiving responses from the language model |
-
-### ❌ Lumina Core DOES NOT
-
-| Forbidden Action | Reason |
-|------------------|--------|
-| Control the OS | Out of scope; violates companion boundary |
-| Read/Write/Delete files | No filesystem access |
-| Control devices | No hardware interaction |
-| Execute tools | Tool execution is disabled |
-| Perform autonomous actions | Lumina only responds, never initiates |
-| Manage agents | No sub-agent orchestration |
-
----
-
-## Pipeline Architecture
+Lumina V2 introduces a decoupled, interface-first layer model to separate connection management from state persistence and request pipeline processing.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     LUMINA CORE                         │
-│                                                         │
-│   ┌─────────┐    ┌─────────┐    ┌─────────┐           │
-│   │   STT   │ ─► │   LLM   │ ─► │   TTS   │           │
-│   │ (Input) │    │(Gemini) │    │(Output) │           │
-│   └─────────┘    └─────────┘    └─────────┘           │
-│        ▲              │              │                 │
-│        │              ▼              ▼                 │
-│   ┌─────────┐    ┌─────────┐    ┌─────────┐           │
-│   │  Mic    │    │ Persona │    │ Speaker │           │
-│   │ Stream  │    │ Control │    │ Stream  │           │
-│   └─────────┘    └─────────┘    └─────────┘           │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           1. Application Entry                            │
+│           (FastAPI / Socket.IO Server Gateway in server.py)               │
+└─────────────────────────────────────┬─────────────────────────────────────┘
+                                      │
+                                      ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           2. Service Resolution                           │
+│        (Dependency Injection Container & RuntimeFacade Services)           │
+└──────────┬──────────────────────────┬──────────────────────────┬──────────┘
+           │                          │                          │
+           ▼                          ▼                          ▼
+┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
+│    3. BrainState    │    │     4. EventBus     │    │ 5. Request Pipeline │
+│ (Pydantic Sandbox / │    │ (InProcessEventBus  │    │  (Structured execution│
+│ atomic transactions)│    │ async pub/sub layer)│    │  middleware list)   │
+└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
 ```
 
 ---
 
-## Language & Persona Specification
+## 3. Subsystem Specifications
 
-### Primary Language
-- **Nepali (ne-NP)** — Modern, casual, conversational
+### A. Dependency Injection Container ([container.py](file:///e:/Lunina-with%20features%20added/backend/core/container.py))
+* **Type**: Thread-safe dynamic service registry.
+* **Binding Life Cycles**: Supports `instance`, `singleton` (lazy-initialized), `transient` (new allocation per query), and dynamic `override` (safe session recreation).
+* **Usage**: Core services resolve their contracts (`IMemoryManager`, `IWorkspaceManager`, etc.) from the container, separating class definitions from runtime instance bindings.
 
-### Style Guidelines
-- Sound like a young urban Nepali speaker
-- Mix English naturally where appropriate
-- Friendly, witty, warm tone
-- Companion-like (not formal, not robotic)
+### B. BrainState Sandbox ([state.py](file:///e:/Lunina-with%20features%20added/backend/brain/state.py))
+* **Type**: Pydantic-validated transaction-managed state tree.
+* **Design Pattern**:
+  * **Immutable Snapshots**: Read queries copy a frozen `BrainSnapshot` representing a consistent point-in-time state.
+  * **Atomic Transactions**: Mutations require a `transaction()` context manager. Changes apply atomically on exit; exceptions trigger automatic rollbacks.
+  * **Thread Safety**: Guarded by an internal Re-entrant Lock (`RLock`).
 
-### Forbidden Language Patterns
-- Formal/academic Nepali
-- Literary or Sanskrit-heavy words
-- News anchor tone
-- Textbook phrasing
+### C. EventBus Subsystem ([events.py](file:///e:/Lunina-with%20features%20added/backend/brain/events.py))
+* **Type**: Asynchronous in-process Publish/Subscribe system.
+* **Features**: Supports concurrent topic matching, asynchronous deliveries, and synchronous notifications for critical startup hook sequences.
+* **Core Topics**:
+  * `session.audio_attached`: Triggered when an active `AudioLoop` is bound.
+  * `session.audio_detached`: Triggered when session finishes or terminates.
+  * `session.shutdown`: Published during FastAPI process shutdown.
 
-### Word Avoidance List
-| Avoid (Nepali) | Prefer (English/Simple) |
-|----------------|------------------------|
-| निर्देशन | direction |
-| जटिल | complex |
-| अमूल्य | priceless |
-| सटीक | precise |
-| विसृत | forgotten |
-
----
-
-## Frozen Components
-
-The following components are **architecturally frozen** and must not be modified without explicit approval:
-
-1. `lumina.py` — Core LLM interaction and audio loop
-2. `server.py` — Socket.IO server and session management
-3. `App.jsx` — Main UI component
-4. Voice pipeline (STT → LLM → TTS)
+### D. Request Execution Pipeline ([pipeline.py](file:///e:/Lunina-with%20features%20added/backend/core/pipeline.py))
+* **Type**: Linear interceptor middleware stack.
+* **Lifecycle**: Maps incoming actions through a sealed list of execution filters, providing cross-cutting validation, logging, and performance auditing without direct handler alterations.
 
 ---
 
-## Change Policy
+## 4. Phase 3 Session & Service Bridge Layers
 
-### Allowed Changes
-- Documentation updates
-- system_instruction text (persona only)
-- UI text/labels (no behavior)
-- Bug fixes that restore existing behavior
+To bridge the gap between concrete runtime engines and V2 DI architectures, Phase 3 introduces two critical synchronization interfaces:
 
-### Forbidden Changes
-- Adding new features
-- Adding agents or tools
-- Changing API contracts
-- Refactoring core logic
-- Performance optimizations that alter flow
+### SessionManager ([session.py](file:///e:/Lunina-with%20features%20added/backend/core/session.py))
+* Centralizes control of active `AudioLoop` sessions, replacing module-level globals in `server.py`.
+* Synchronizes session connect/disconnect timestamps with `BrainState` attributes.
+* Publishes lifecycle changes on the `EventBus` to notify downstream subscribers.
+
+### ServiceAccessor ([service_accessor.py](file:///e:/Lunina-with%20features%20added/backend/core/service_accessor.py))
+* Safe bridge routing subsystem requests (`MemoryStore`, `ProjectManager`) first to the DI container.
+* Falls back to properties of the active `AudioLoop` if early initialization is in progress or container registrations are incomplete.
 
 ---
 
-## Versioning
+## 5. Architectural Quality Attributes
 
-| Version | Description |
-|---------|-------------|
-| 1.x | Original A.D.A system |
-| 2.0.0 | Lumina rebrand, architecture freeze |
+> [!IMPORTANT]
+> **AESTHETICS & VISUALS**: All UI adjustments must maintain clean, modern dark mode coordinates.
+> **STABILITY & LATENCY**: The audio stream operates under a hard 20ms frame budget. Service access layers must not block the main asyncio loop.
 
 ---
 
-*This document defines the architectural boundaries of Lumina Core. Any changes that violate these boundaries require explicit review.*
+*This document is locked and frozen. Modification to the core layers specified above requires a formal technical proposal and approval.*

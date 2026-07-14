@@ -460,13 +460,13 @@ except Exception as e:
     _fail("18. DI container registration/resolution", str(e))
 
 try:
-    isinstance(test_bs, IBrainState)
+    assert isinstance(test_bs, IBrainState), "BrainState must be an IBrainState instance"
     _ok("19. BrainState is a valid IBrainState implementation (isinstance check)")
 except Exception as e:
     _fail("19. isinstance(BrainState, IBrainState)", str(e))
 
 try:
-    isinstance(test_bus, IEventBus)
+    assert isinstance(test_bus, IEventBus), "InProcessEventBus must be an IEventBus instance"
     _ok("20. InProcessEventBus is a valid IEventBus implementation (isinstance check)")
 except Exception as e:
     _fail("20. isinstance(InProcessEventBus, IEventBus)", str(e))

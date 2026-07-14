@@ -470,6 +470,24 @@ class IEventBus(ABC):
     async def unsubscribe(self, token: Any) -> None:
         """Remove a subscription by its token."""
 
+    # ---- Synchronous variants (for non-async callers) ----
+
+    @abstractmethod
+    def publish_sync(self, topic: str, payload: Dict, priority: str = "MEDIUM") -> None:
+        """Synchronous publish. Delivers to sync handlers in the caller's thread."""
+
+    @abstractmethod
+    def subscribe_sync(self, topic: str, callback: Any) -> Any:
+        """Synchronous subscribe. Returns a SubscriptionToken."""
+
+    @abstractmethod
+    def unsubscribe_sync(self, token: Any) -> None:
+        """Synchronous unsubscribe by token."""
+
+    @abstractmethod
+    def get_status(self) -> Dict[str, Any]:
+        """Return a diagnostic snapshot of the subscription table."""
+
 
 # ===========================================================================
 # IExecutionContext

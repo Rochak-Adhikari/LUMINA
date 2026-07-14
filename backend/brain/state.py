@@ -56,6 +56,8 @@ from typing import Any, Dict, Generator, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.interfaces import IBrainState
+
 
 # ===========================================================================
 # Section 1: Pydantic field models (sub-objects inside the main state)
@@ -357,7 +359,7 @@ class _MutableDraft:
 # ===========================================================================
 
 
-class BrainState:
+class BrainState(IBrainState):
     """
     Thread-safe, single source of runtime truth for Lumina V2.
 
