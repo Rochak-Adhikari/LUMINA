@@ -1,589 +1,341 @@
-# Lumina - AI Companion
+# Lumina
 
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11-blue?logo=python)
-![React](https://img.shields.io/badge/React-18.2-61DAFB?logo=react)
-![Electron](https://img.shields.io/badge/Electron-28-47848F?logo=electron)
-![Gemini](https://img.shields.io/badge/Google%20Gemini-Native%20Audio-4285F4?logo=google)
-![License](https://img.shields.io/badge/License-MIT-green)
+<p align="center">
+  <img src="assets/logo.png" alt="Lumina Logo" width="180"/>
+</p>
 
-> **Lumina** (nickname: Luna) — An AI companion created by Scepter (Rochak Adhikari)
+<p align="center">
+  <strong>A modular, extensible desktop AI assistant built with Electron, React, FastAPI, and Python.</strong>
+</p>
 
----
-
-## 🪪 System Identity
-
-| Property | Value |
-|----------|-------|
-| **Name** | Lumina |
-| **Nickname** | Luna |
-| **Creator** | Scepter (Rochak Adhikari) |
-| **Role** | Long-term AI companion |
-| **Primary Language** | Nepali (casual, modern, urban) with natural English mixing |
-
-**Lumina is NOT** a chatbot, a tool, or an assistant.  
-**Lumina IS** a conversational companion — friendly, witty, warm, like a close friend.
+<p align="center">
+  <img src="https://img.shields.io/badge/status-active-success" />
+  <img src="https://img.shields.io/badge/python-3.12-blue" />
+  <img src="https://img.shields.io/badge/electron-latest-47848F" />
+  <img src="https://img.shields.io/badge/react-19-61DAFB" />
+  <img src="https://img.shields.io/badge/license-MIT-green" />
+</p>
 
 ---
 
-## 🧠 Lumina Core Responsibilities
+## Overview
 
-Lumina Core handles **conversation flow only**:
+Lumina is an AI desktop assistant focused on modular architecture, local execution, extensibility, and real-world productivity.
 
-| ✅ Lumina Core OWNS | ❌ Lumina Core DOES NOT |
-|---------------------|------------------------|
-| Conversation orchestration | Control the OS |
-| Voice pipeline (STT → LLM → TTS) | Read/write/delete files |
-| Persona & tone control | Control devices |
-| Session context | Execute tools |
-| LLM interaction | Perform autonomous actions |
+Unlike traditional chatbot applications, Lumina combines conversational AI with desktop automation, browser interaction, memory, voice, and developer tooling through a clean service-oriented architecture.
 
-> 📄 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architectural specification.
+The project is currently undergoing a major architectural refactor to make future development faster, safer, and easier to extend.
 
 ---
 
-Lumina is a voice-first AI companion built on Google's Gemini 2.5 Native Audio, packaged as an Electron desktop application.
+# Features
+
+### AI Conversation
+
+- Natural language conversations
+- Streaming responses
+- Persona system
+- Long-term memory
+- Context-aware conversations
+
+### Voice
+
+- Speech-to-text
+- Text-to-speech
+- Voice Activity Detection (VAD)
+- Continuous conversation mode
+
+### Desktop Automation
+
+- Browser automation
+- Desktop control
+- Application launching
+- File processing
+- Developer tools
+- Reminder system
+
+### Memory
+
+- Long-term memory
+- Memory lifecycle management
+- Hybrid semantic search
+- Memory approval workflow
+
+### Architecture
+
+- Dependency Injection
+- Event Bus
+- Runtime Context
+- Session Manager
+- Service Container
+- Modular interfaces
+- Extensible pipeline
 
 ---
 
-## 🌟 Capabilities at a Glance
+# Technology Stack
 
-| Feature | Description | Technology |
-|---------|-------------|------------|
-| **🗣️ Low-Latency Voice** | Real-time conversation with interrupt handling | Gemini 2.5 Native Audio |
-| **🧊 Parametric CAD** | Editable 3D model generation from voice prompts | `build123d` → STL |
-| **🖨️ 3D Printing** | Slicing and wireless print job submission | OrcaSlicer + Moonraker/OctoPrint |
-| **🖐️ Minority Report UI** | Gesture-controlled window manipulation | MediaPipe Hand Tracking |
-| **👁️ Face Authentication** | Secure local biometric login | MediaPipe Face Landmarker |
-| **🌐 Web Agent** | Autonomous browser automation | Playwright + Chromium |
-| **🏠 Smart Home** | Voice control for TP-Link Kasa devices | `python-kasa` |
-| **📁 Project Memory** | Persistent context across sessions | File-based JSON storage |
+## Frontend
 
-### 🖐️ Gesture Control Details
+- React 19
+- Electron
+- Vite
+- TypeScript
 
-Lumina's "Minority Report" interface uses your webcam to detect hand gestures:
+## Backend
 
-| Gesture | Action |
-|---------|--------|
-| 🤏 **Pinch** | Confirm action / click |
-| ✋ **Open Palm** | Release the window |
-| ✊ **Close Fist** | "Select" and grab a UI window to drag it |
+- FastAPI
+- Python 3.12
+- AsyncIO
 
-> **Tip**: Enable the video feed window to see the hand tracking overlay.
+## AI
+
+- OpenAI Compatible APIs
+- Memory Engine
+- Tool Calling
+- Voice Pipeline
 
 ---
 
-## 🏗️ Architecture Overview
+# Project Structure
 
-```mermaid
-graph TB
-    subgraph Frontend ["Frontend (Electron + React)"]
-        UI[React UI]
-        THREE[Three.js 3D Viewer]
-        GESTURE[MediaPipe Gestures]
-        SOCKET_C[Socket.IO Client]
-    end
-    
-    subgraph Backend ["Backend (Python 3.11 + FastAPI)"]
-        SERVER[server.py<br/>Socket.IO Server]
-        LUMINA[lumina.py<br/>Gemini Live API]
-        WEB[web_agent.py<br/>Playwright Browser]
-        CAD[cad_agent.py<br/>CAD + build123d]
-        PRINTER[printer_agent.py<br/>3D Printing + OrcaSlicer]
-        KASA[kasa_agent.py<br/>Smart Home]
-        AUTH[authenticator.py<br/>MediaPipe Face Auth]
-        PM[project_manager.py<br/>Project Context]
-    end
-    
-    UI --> SOCKET_C
-    SOCKET_C <--> SERVER
-    SERVER --> LUMINA
-    LUMINA --> WEB
-    LUMINA --> CAD
-    LUMINA --> KASA
-    SERVER --> AUTH
-    SERVER --> PM
-    SERVER --> PRINTER
-    CAD -->|STL file| THREE
-    CAD -->|STL file| PRINTER
+```
+backend/
+│
+├── brain/
+│   ├── events.py
+│   ├── state.py
+│   └── ...
+│
+├── core/
+│   ├── application.py
+│   ├── bootstrap.py
+│   ├── container.py
+│   ├── interfaces.py
+│   ├── pipeline.py
+│   ├── runtime_facade.py
+│   ├── services.py
+│   └── ...
+│
+├── server.py
+└── lumina.py
+
+frontend/
+
+docs/
+
+workspace/
 ```
 
 ---
 
-## ⚡ TL;DR Quick Start (Experienced Developers)
+# Architecture
 
-<details>
-<summary>Click to expand quick setup commands</summary>
+The new architecture is centered around several core systems:
+
+- Dependency Injection Container
+- Runtime Facade
+- Event Bus
+- Brain State Manager
+- Session Manager
+- Middleware Pipeline
+- Service Accessor Layer
+- Validation Layer
+
+Documentation:
+
+- ARCHITECTURE.md
+- DEPENDENCY_GRAPH.md
+- EVENT_FLOW.md
+- RUNTIME_FLOW.md
+- SESSION_MANAGER.md
+- ROADMAP.md
+- PHASE_HISTORY.md
+- VISION.md
+
+---
+
+# Getting Started
+
+## Clone
 
 ```bash
-# 1. Clone and enter
-git clone https://github.com/scepter/lumina.git && cd lumina
+git clone https://github.com/Rochak-Adhikari/LUMINA.git
 
-# 2. Create Python environment (Python 3.11)
-conda create -n lumina python=3.11 -y && conda activate lumina
-brew install portaudio  # macOS only (for PyAudio)
+cd LUMINA
+```
+
+---
+
+## Backend
+
+Create a virtual environment
+
+```bash
+python -m venv .venv
+```
+
+Activate it
+
+Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+Linux/macOS
+
+```bash
+source .venv/bin/activate
+```
+
+Install dependencies
+
+```bash
 pip install -r requirements.txt
-playwright install chromium
-
-# 3. Setup frontend
-npm install
-
-# 4. Create .env file
-echo "GEMINI_API_KEY=your_key_here" > .env
-
-# 5. Run!
-conda activate lumina && npm run dev
 ```
-
-</details>
 
 ---
 
-## 🛠️ Installation Requirements
-
-### 🆕 Absolute Beginner Setup (Start Here)
-If you have never coded before, follow these steps first!
-
-**Step 1: Install Visual Studio Code (The Editor)**
-- Download and install [VS Code](https://code.visualstudio.com/). This is where you will write code and run commands.
-
-**Step 2: Install Anaconda (The Manager)**
-- Download [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (a lightweight version of Anaconda).
-- This tool allows us to create isolated "playgrounds" (environments) for our code so different projects don't break each other.
-- **Windows Users**: During install, check "Add Anaconda to my PATH environment variable" (even if it says not recommended, it makes things easier for beginners).
-
-**Step 3: Install Git (The Downloader)**
-- **Windows**: Download [Git for Windows](https://git-scm.com/download/win).
-- **Mac**: Open the "Terminal" app (Cmd+Space, type Terminal) and type `git`. If not installed, it will ask to install developer tools—say yes.
-
-**Step 4: Get the Code**
-1. Open your terminal (or Command Prompt on Windows).
-2. Type this command and hit Enter:
-   ```bash
-   git clone https://github.com/scepter/lumina.git
-   ```
-3. This creates a folder named `lumina`.
-
-**Step 5: Open in VS Code**
-1. Open VS Code.
-2. Go to **File > Open Folder**.
-3. Select the `lumina` folder you just downloaded.
-4. Open the internal terminal: Press `Ctrl + ~` (tilde) or go to **Terminal > New Terminal**.
-
----
-
-### ⚠️ Technical Prerequisites
-Once you have the basics above, continue here.
-
-### 1. System Dependencies
-
-**MacOS:**
-```bash
-# Audio Input/Output support (PyAudio)
-brew install portaudio
-```
-
-**Windows:**
-- No additional system dependencies required!
-
-### 2. Python Environment
-Create a single Python 3.11 environment:
+## Frontend
 
 ```bash
-conda create -n lumina python=3.11
-conda activate lumina
-
-# Install all dependencies
-pip install -r requirements.txt
-
-# Install Playwright browsers
-playwright install chromium
-```
-
-### 3. Frontend Setup
-Requires **Node.js 18+** and **npm**. Download from [nodejs.org](https://nodejs.org/) if not installed.
-
-```bash
-# Verify Node is installed
-node --version  # Should show v18.x or higher
-
-# Install frontend dependencies
 npm install
 ```
 
-### 4. 🔐 Face Authentication Setup
-To use the secure voice features, Lumina needs to know what you look like.
+---
 
-1. Take a clear photo of your face (or use an existing one).
-2. Rename the file to `reference.jpg`.
-3. Drag and drop this file into the `lumina/backend` folder.
-4. (Optional) You can toggle this feature on/off in `settings.json` by changing `"face_auth_enabled": true/false`.
+## Environment
+
+Create a `.env` file and configure the required API keys.
+
+Example:
+
+```env
+OPENAI_API_KEY=
+
+OPENAI_BASE_URL=
+
+MODEL=
+```
 
 ---
 
-## ⚙️ Configuration (`settings.json`)
+## Run
 
-The system creates a `settings.json` file on first run. You can modify this to change behavior:
+Backend
 
-| Key | Type | Description |
-| :--- | :--- | :--- |
-| `face_auth_enabled` | `bool` | If `true`, blocks all AI interaction until your face is recognized via the camera. |
-| `tool_permissions` | `obj` | Controls manual approval for specific tools. |
-| `tool_permissions.generate_cad` | `bool` | If `true`, requires you to click "Confirm" on the UI before generating CAD. |
-| `tool_permissions.run_web_agent` | `bool` | If `true`, requires confirmation before opening the browser agent. |
-| `tool_permissions.write_file` | `bool` | **Critical**: Requires confirmation before the AI writes code/files to disk. |
-
----
-
-### 5. 🖨️ 3D Printer Setup
-Lumina can slice STL files and send them directly to your 3D printer.
-
-**Supported Hardware:**
-- **Klipper/Moonraker** (Creality K1, Voron, etc.)
-- **OctoPrint** instances
-- **PrusaLink** (Experimental)
-
-**Step 1: Install Slicer**
-Lumina uses **OrcaSlicer** (recommended) or PrusaSlicer to generate G-code.
-1. Download and install [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer).
-2. Run it once to ensure profiles are created.
-3. Lumina automatically detects the installation path.
-
-**Step 2: Connect Printer**
-1. Ensure your printer and computer are on the **same Wi-Fi network**.
-2. Open the **Printer Window** in Lumina (Cube icon).
-3. Lumina automatically scans for printers using mDNS.
-4. **Manual Connection**: If your printer isn't found, use the "Add Printer" button and enter the IP address (e.g., `192.168.1.50`).
-
----
-
-### 6. 🔑 Gemini API Key Setup
-Lumina uses Google's Gemini API for voice and intelligence. You need a free API key.
-
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey).
-2. Sign in with your Google account.
-3. Click **"Create API Key"** and copy the generated key.
-4. Create a file named `.env` in the `lumina` folder (same level as `README.md`).
-5. Add this line to the file:
-   ```
-   GEMINI_API_KEY=your_api_key_here
-   ```
-6. Replace `your_api_key_here` with the key you copied.
-
-> **Note**: Keep this key private! Never commit your `.env` file to Git.
-
----
-
-## 🚀 Running Lumina
-
-You have two options to run the app. Ensure your `lumina` environment is active!
-
-### Option 1: The "Easy" Way (Single Terminal)
-The app is smart enough to start the backend for you.
-1. Open your terminal in the `lumina` folder.
-2. Activate your environment: `conda activate lumina`
-3. Run:
-   ```bash
-   npm run dev
-   ```
-4. The backend will start automatically in the background.
-
-### Option 2: The "Developer" Way (Two Terminals)
-Use this if you want to see the Python logs (recommended for debugging).
-
-**Terminal 1 (Backend):**
 ```bash
-conda activate lumina
 python backend/server.py
 ```
 
-**Terminal 2 (Frontend):**
+Frontend
+
 ```bash
-# Environment doesn't matter here, but keep it simple
 npm run dev
 ```
 
----
-
-## ✅ First Flight Checklist (Things to Test)
-
-1. **Voice Check**: Say "Hello Luna". She should respond.
-2. **Vision Check**: Look at the camera. If Face Auth is on, the lock screen should unlock.
-3. **CAD Check**: Open the CAD window and say "Create a cube". Watch the logs.
-4. **Web Check**: Open the Browser window and say "Go to Google".
-5. **Smart Home**: If you have Kasa devices, say "Turn on the lights".
-
----
-
-## ▶️ Commands & Tools Reference
-
-### 🗣️ Voice Commands
-- "Switch project to [Name]"
-- "Create a new project called [Name]"
-- "Turn on the [Room] light"
-- "Make the light [Color]"
-- "Pause audio" / "Stop audio"
-
-### 🧊 3D CAD
-- **Prompt**: "Create a 3D model of a hex bolt."
-- **Iterate**: "Make the head thinner." (Requires previous context)
-- **Files**: Saves to `projects/[ProjectName]/output.stl`.
-
-### 🌐 Web Agent
-- **Prompt**: "Go to Amazon and find a USB-C cable under $10."
-- **Note**: The agent will auto-scroll, click, and type. Do not interfere with the browser window while it runs.
-
-### 🖨️ Printing & Slicing
-- **Auto-Discovery**: Lumina automatically finds printers on your network.
-- **Slicing**: Click "Slice & Print" on any generated 3D model.
-- **Profiles**: Lumina intelligently selects the correct OrcaSlicer profile based on your printer's name (e.g., "Creality K1").
-
----
-
-## ❓ Troubleshooting FAQ
-
-### Camera not working / Permission denied (Mac)
-**Symptoms**: Error about camera access, or video feed shows black.
-
-**Solution**:
-1. Go to **System Preferences > Privacy & Security > Camera**.
-2. Ensure your terminal app (e.g., Terminal, iTerm, VS Code) has camera access enabled.
-3. Restart the app after granting permission.
-
----
-
-### `GEMINI_API_KEY` not found / Authentication Error
-**Symptoms**: Backend crashes on startup with "API key not found".
-
-**Solution**:
-1. Make sure your `.env` file is in the root `lumina` folder (not inside `backend/`).
-2. Verify the format is exactly: `GEMINI_API_KEY=your_key` (no quotes, no spaces).
-3. Restart the backend after editing the file.
-
----
-
-### WebSocket connection errors (1011)
-**Symptoms**: `websockets.exceptions.ConnectionClosedError: 1011 (internal error)`.
-
-**Solution**:
-This is a server-side issue from the Gemini API. Simply reconnect by clicking the connect button or saying "Hello Luna" again. If it persists, check your internet connection or try again later.
-
----
-
-## 📸 What It Looks Like
-
-*Coming soon! Screenshots and demo videos will be added here.*
-
----
-
-## 📂 Project Structure
-
-```
-lumina/
-├── backend/                    # Python server & AI logic
-│   ├── lumina.py               # Gemini Live API integration
-│   ├── server.py               # FastAPI + Socket.IO server
-│   ├── cad_agent.py            # CAD generation orchestrator
-│   ├── printer_agent.py        # 3D printer discovery & slicing
-│   ├── web_agent.py            # Playwright browser automation
-│   ├── kasa_agent.py           # TP-Link smart home control
-│   ├── authenticator.py        # MediaPipe face auth logic
-│   ├── project_manager.py      # Project context management
-│   ├── tools.py                # Tool definitions for Gemini
-│   └── reference.jpg           # Your face photo (add this!)
-├── src/                        # React frontend
-│   ├── App.jsx                 # Main application component
-│   ├── components/             # UI components (11 files)
-│   └── index.css               # Global styles
-├── electron/                   # Electron main process
-│   └── main.js                 # Window & IPC setup
-├── projects/                   # User project data (auto-created)
-├── .env                        # API keys (create this!)
-├── requirements.txt            # Python dependencies
-├── package.json                # Node.js dependencies
-└── README.md                   # You are here!
-```
-
----
-
-## ⚠️ Known Limitations
-
-| Limitation | Details |
-|------------|---------|
-| **macOS & Windows** | Tested on macOS 14+ and Windows 10/11. Linux is untested. |
-| **Camera Required** | Face auth and gesture control need a working webcam. |
-| **Gemini API Quota** | Free tier has rate limits; heavy CAD iteration may hit limits. |
-| **Network Dependency** | Requires internet for Gemini API (no offline mode). |
-| **Single User** | Face auth recognizes one person (the `reference.jpg`). |
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Here's how:
-
-1. **Fork** the repository.
-2. **Create a branch**: `git checkout -b feature/amazing-feature`
-3. **Commit** your changes: `git commit -m 'Add amazing feature'`
-4. **Push** to the branch: `git push origin feature/amazing-feature`
-5. **Open a Pull Request** with a clear description.
-
-### Development Tips
-
-- Run the backend separately (`python backend/server.py`) to see Python logs.
-- Use `npm run dev` without Electron during frontend development (faster reload).
-- The `projects/` folder contains user data—don't commit it to Git.
-
----
-
-## 🔒 Security Considerations
-
-| Aspect | Implementation |
-|--------|----------------|
-| **API Keys** | Stored in `.env`, never committed to Git. |
-| **Face Data** | Processed locally, never uploaded. |
-| **Tool Confirmations** | Write/CAD/Web actions can require user approval. |
-| **No Cloud Storage** | All project data stays on your machine. |
-
-> [!WARNING]
-> Never share your `.env` file or `reference.jpg`. These contain sensitive credentials and biometric data.
-
----
-
-## 🌐 Local Brave Browser Control (Phase T2)
-
-Lumina can control the user's **real Brave browser window** (visible, with audio) via Chrome DevTools Protocol (CDP). This enables playing YouTube videos, navigating websites, and interacting with pages — all in a foreground window with the user's logged-in sessions.
-
-### How It Works
-
-1. Lumina launches Brave with `--remote-debugging-port=9222` (or attaches if already running with that flag).
-2. Connects via Playwright's `connect_over_cdp` to the user's real profile.
-3. Executes safe actions: `open_url`, `play_pause`, `click_selector`, `click_at`, `scroll`, `go_back`, `go_forward`, `reload`, `get_state`.
-4. No typing, form submission, downloads, or file uploads allowed (Phase 1 safety).
-
-### Environment Variables
-
-Add to your `.env` file:
-
-```env
-LOCAL_BROWSER=brave
-BRAVE_PROFILE_DIR=Default
-BRAVE_REMOTE_DEBUGGING_PORT=9222
-LOCAL_BROWSER_AUTOSTART=true
-```
-
-Optional overrides (auto-detected on Windows):
-```env
-BRAVE_EXECUTABLE_PATH=C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe
-BRAVE_USER_DATA_DIR=C:\Users\<YOU>\AppData\Local\BraveSoftware\Brave-Browser\User Data
-```
-
-Enable in tool clamp:
-```env
-LUMINA_TOOL_CLAMP_ALLOW=browser_control,local_browser_control
-```
-
-### Manual Testing
+Electron
 
 ```bash
-# Check CDP status
-curl http://localhost:8000/local-browser/status
-
-# Open a URL
-curl -X POST http://localhost:8000/local-browser/open -H "Content-Type: application/json" -d "{\"url\": \"https://www.youtube.com\"}"
+npm run electron
 ```
 
-### Troubleshooting
+---
 
-| Issue | Solution |
-|-------|----------|
-| **Brave running without debug port** | Close all Brave windows, let Lumina restart it, or manually run: `brave.exe --remote-debugging-port=9222 --user-data-dir="..." --profile-directory="Default"` |
-| **Port 9222 in use** | Change `BRAVE_REMOTE_DEBUGGING_PORT` in `.env` |
-| **Brave not found** | Set `BRAVE_EXECUTABLE_PATH` in `.env` to the full path |
-| **Wrong profile** | Set `BRAVE_PROFILE_DIR` to your profile folder name (e.g., `Profile 1`) |
-| **Firewall blocking CDP** | Allow localhost:9222 in your firewall settings |
+# Current Architecture Progress
+
+## Phase 1
+
+- Runtime Foundation
+- Dependency Injection
+- Context System
+- Session Layer
+- Bootstrap System
+
+Completed
 
 ---
 
-## 🙏 Acknowledgments
+## Phase 2
 
-- **[Google Gemini](https://deepmind.google/technologies/gemini/)** — Native Audio API for real-time voice
-- **[build123d](https://github.com/gumyr/build123d)** — Modern parametric CAD library
-- **[MediaPipe](https://developers.google.com/mediapipe)** — Hand tracking, gesture recognition, and face authentication
-- **[Playwright](https://playwright.dev/)** — Reliable browser automation
+- Brain State
+- Event System
+- Memory Integration
+- Runtime Pipeline
 
----
-
-## 📄 License
-
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+Completed
 
 ---
 
-## Panel Actions: Quests, Events, Knowledge Archive
+## Phase 3
 
-### Overview
+- Interface Extraction
+- Service Accessors
+- Runtime Facade
+- Validation Layer
 
-Lumina's sidebar provides three interactive panels for tracking goals, scheduling, and note-taking. All data persists in the same local SQLite database (`backend/lumina_memory.db`) used by the memory system.
+Completed
 
-### Data Storage
+---
 
-| Panel | DB Table | Key Fields |
-|-------|----------|------------|
-| **Quests** | `quests` | title, description, priority (low/medium/high), status (active/completed/side), progress (0-100) |
-| **Events** | `events` | title, datetime, notes, completed (0/1) |
-| **Knowledge Archive** | `archive_notes` | title, body, tags (comma-separated), pinned (0/1) |
+# Roadmap
 
-Tables are created automatically on first backend startup via `MemoryStore._init_database()`.
+- Plugin system
+- Multi-agent workflows
+- Mobile companion
+- Local LLM support
+- Advanced memory graph
+- Workflow automation
+- Vision improvements
+- Tool marketplace
 
-### Socket Events (Frontend <-> Backend)
+---
 
-**Quests:** `list_quests` / `create_quest` / `update_quest` / `delete_quest` -> responses: `quests_list` / `quest_created` / `quest_updated` / `quest_deleted`
+# Contributing
 
-**Events:** `list_events` / `create_event` / `update_event` / `delete_event` -> responses: `events_list` / `event_created` / `event_updated` / `event_deleted`
+Contributions are welcome.
 
-**Archive:** `list_archive_notes` / `create_archive_note` / `update_archive_note` / `delete_archive_note` -> responses: `archive_notes_list` / `archive_note_created` / `archive_note_updated` / `archive_note_deleted`
+1. Fork the repository
 
-**Errors:** All panels share `panel_error` event with `{ panel: "quests"|"events"|"archive", error: "..." }`.
-
-### How to Use
-
-1. Open sidebar (toggle button in top-left)
-2. Click **Knowledge Archive**, **Events / Reminders**, or **Quests**
-3. Click **"+ Add"** button in top-right of each panel
-4. Fill in the form and submit
-5. Items persist after reload (stored in SQLite)
-
-### Knowledge Archive Guidelines
-
-- **IS for:** Important notes, decision summaries, actionable ideas, tagged reference material
-- **IS NOT for:** Credential storage, memory dumps, auto-generated content
-- **Suggested tags:** project, study, health, idea, bug, fix, personal
-- Pin important notes to keep them at the top
-
-### Testing
+2. Create a feature branch
 
 ```bash
-# Start backend
-cd backend && conda activate lumina && python server.py
-
-# Start frontend (separate terminal)
-cd Luna && npm run dev
-
-# Verify in browser:
-# 1. Open sidebar -> Knowledge Archive -> Add Note -> verify it persists after reload
-# 2. Open sidebar -> Events -> Add Event -> verify it persists after reload
-# 3. Open sidebar -> Quests -> Add Quest -> verify it persists after reload
-# 4. Settings -> Tools section shows policy clamp status when active
-# 5. Tool toggles reflect effective backend state
+git checkout -b feature/my-feature
 ```
 
-### Tool Permissions & Policy Clamp
+3. Commit
 
-Tool toggles in Settings reflect the effective state from the backend. When `LUMINA_TOOL_CLAMP_MODE=on` (default), tools are enforced by server config and toggles show "policy" hint. Set `LUMINA_TOOL_CLAMP_MODE=off` in `.env` to allow manual toggling.
+```bash
+git commit -m "feat: add feature"
+```
+
+4. Push
+
+```bash
+git push origin feature/my-feature
+```
+
+5. Open a Pull Request
+
+---
+
+# License
+
+This project is licensed under the MIT License.
+
+See the LICENSE file for details.
+
+---
+
+# Acknowledgements
+
+Lumina builds upon ideas and inspiration from numerous open-source AI assistant projects and the broader AI developer community.
+
+Special thanks to all contributors and open-source maintainers whose work has helped shape this project.
 
 ---
 
 <p align="center">
-  <strong>Built with 🤖 by Scepter (Rochak Adhikari)</strong><br>
-  <em>Bridging AI, CAD, and Vision in a Single Interface</em>
+Made with ❤️ by the Lumina Contributors
 </p>
