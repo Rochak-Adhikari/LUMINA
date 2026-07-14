@@ -21,7 +21,7 @@ RuntimeFacade rather than on concrete service construction.
 from __future__ import annotations
 
 from core.container import DependencyContainer, container as _default_container
-from core.interfaces import IBrainState, IEventBus, IPipeline
+from core.interfaces import IBrainState, IEventBus, IPipeline, IMemoryManager, IWorkspaceManager
 from core.context import ExecutionContextFactory
 from core.adapters import (
     BrainStateAdapter,
@@ -61,6 +61,14 @@ class RuntimeFacade:
     @property
     def pipeline(self) -> IPipeline:
         return services.get_pipeline(self._container)
+
+    @property
+    def memory_manager(self) -> IMemoryManager:
+        return services.get_memory_manager(self._container)
+
+    @property
+    def workspace_manager(self) -> IWorkspaceManager:
+        return services.get_workspace_manager(self._container)
 
     # ---- Adapters ------------------------------------------------------
 

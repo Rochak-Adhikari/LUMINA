@@ -25,7 +25,7 @@ infrastructure only, matching the scope of Phase 1.6's adapters.
 from __future__ import annotations
 
 from core.container import DependencyContainer, container as _default_container
-from core.interfaces import IBrainState, IEventBus, IPipeline
+from core.interfaces import IBrainState, IEventBus, IPipeline, IMemoryManager, IWorkspaceManager
 from core.context import ExecutionContextFactory
 from core.adapters import (
     BrainStateAdapter,
@@ -33,6 +33,16 @@ from core.adapters import (
     ExecutionContextAdapter,
     PipelineAdapter,
 )
+
+
+def get_memory_manager(c: DependencyContainer = _default_container) -> IMemoryManager:
+    """Resolve the registered IMemoryManager implementation."""
+    return c.resolve(IMemoryManager)
+
+
+def get_workspace_manager(c: DependencyContainer = _default_container) -> IWorkspaceManager:
+    """Resolve the registered IWorkspaceManager implementation."""
+    return c.resolve(IWorkspaceManager)
 
 
 def get_brain_state(c: DependencyContainer = _default_container) -> IBrainState:

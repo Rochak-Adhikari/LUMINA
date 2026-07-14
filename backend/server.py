@@ -904,6 +904,13 @@ async def disconnect(sid):
     if sid in connected_clients:
         del connected_clients[sid]
 
+    # Phase 2.2: Publish session.disconnected event to EventBus via RuntimeFacade
+    try:
+        await _runtime_facade.event_bus_adapter.publish("session.disconnected", {"client_sid": sid})
+    except Exception as e:
+        print(f"[DI] EventBus disconnect publish failed (non-fatal): {e}")
+
+
 # ========================================
 # TRANSCRIPT AGGREGATOR (FIX A) — kill micro-stores
 # ========================================
@@ -1126,17 +1133,10 @@ async def start_audio(sid, data=None):
     def on_tool_confirmation(data):
         # data = {"id": "uuid", "tool": "tool_name", "args": {...}}
         print(f"Requesting confirmation for tool: {data.get('tool')}")
-        # Phase 2 (runtime migration): mirror the pending confirmation id
-        # into BrainState via the RuntimeFacade/BrainStateAdapter. Additive
-        # only — lumina.py's own _pending_confirmations dict remains the
-        # sole source of truth for resolving the asyncio Future; this call
-        # cannot affect that behaviour.
-        try:
-            with _runtime_facade.brain_state_adapter.transaction() as draft:
-                draft.pending_confirmation_id = data.get('id')
-        except Exception as e:
-            print(f"[DI] BrainState pending-confirmation mirror failed (non-fatal): {e}")
+        # Note: pending_confirmation_id is now authoritatively set and cleared inside
+        # AudioLoop (lumina.py) via RuntimeFacade -> BrainStateAdapter -> BrainState.
         asyncio.create_task(sio.emit('tool_confirmation_request', data))
+
 
     # Callback to send CAD status to frontend
     def on_cad_status(status):
@@ -2576,8 +2576,14 @@ async def generate_cad(sid, data):
         await sio.emit('status', {'msg': 'Generating new design...'})
         await sio.emit('cad_status', {'status': 'generating'})
         
-        # Use generate_prototype based on prompt with project path
-        cad_output_dir = str(audio_loop.project_manager.get_current_project_path() / "cad")
+        # Use generate_prototype based on prompt with project path resolved via WorkspaceManager
+        try:
+            workspace_mgr = _runtime_facade.workspace_manager
+            project_path = workspace_mgr.get_current_project_path()
+        except Exception:
+            project_path = audio_loop.project_manager.get_current_project_path()
+            
+        cad_output_dir = str(project_path / "cad")
         result = await audio_loop.cad_agent.generate_prototype(prompt, output_dir=cad_output_dir)
         
         if result:
@@ -3046,6 +3052,27 @@ async def list_quests(sid, data=None):
 
 @sio.event
 async def create_quest(sid, data):
+    # Phase 2.3: Resolve a fresh execution context adapter and derive request-level context
+    ctx = _runtime_facade.new_execution_context_adapter().child(
+        client_sid=sid,
+        metadata={"event": "create_quest", "title": data.get("title")}
+    )
+    print(f"[TRACE] create_quest starting - context_id={ctx.context_id} correlation_id={ctx.correlation_id}")
+    
+    # Phase 2.4: Execute request through the RequestPipeline
+    from core.pipeline import PipelineContext
+    brain_snap = _runtime_facade.brain_state_adapter.snapshot()
+    pipeline_ctx = PipelineContext(
+        execution_context=ctx._execution_context,
+        brain_snapshot=brain_snap,
+        request_metadata={"event": "create_quest", "title": data.get("title")}
+    )
+    try:
+        pipeline_ctx = await _runtime_facade.pipeline.execute(pipeline_ctx)
+        print(f"[TRACE] create_quest pipeline executed - context_id={ctx.context_id} is_cancelled={pipeline_ctx.is_cancelled}")
+    except Exception as pe:
+        print(f"[TRACE] create_quest pipeline failed (non-fatal) - error={pe}")
+
     store = _get_memory_store()
     try:
         quest = store.create_quest(
@@ -3054,10 +3081,14 @@ async def create_quest(sid, data):
             priority=data.get("priority", "medium"),
             status=data.get("status", "active"),
         )
+        print(f"[TRACE] create_quest finished successfully - context_id={ctx.context_id}")
         await sio.emit("quest_created", quest)
     except Exception as e:
+        print(f"[TRACE] create_quest failed - context_id={ctx.context_id} error={e}")
         print(f"[PANEL] create_quest error: {e}")
         await sio.emit("panel_error", {"panel": "quests", "error": str(e)}, to=sid)
+
+
 
 @sio.event
 async def update_quest(sid, data):
@@ -3333,7 +3364,9 @@ async def get_memories(sid, data=None):
         "limit": 10 (optional)
     }
     """
-    if not audio_loop or not audio_loop.memory_store:
+    try:
+        mgr = _runtime_facade.memory_manager
+    except Exception:
         await sio.emit('error', {'msg': "Memory store not available"})
         return
     
@@ -3341,12 +3374,13 @@ async def get_memories(sid, data=None):
         memory_type = data.get('type') if data else None
         limit = data.get('limit', 10) if data else 10
         
-        memories = audio_loop.memory_store.get_memories(memory_type, limit, update_access=False)
+        memories = mgr.get_memories(memory_type, limit, update_access=False)
         await sio.emit('memories', {'memories': memories})
         
     except Exception as e:
         print(f"Error getting memories: {e}")
         await sio.emit('error', {'msg': f"Failed to get memories: {str(e)}"})
+
 
 @sio.event
 async def get_memory_stats(sid):
