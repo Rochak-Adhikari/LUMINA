@@ -82,15 +82,26 @@ async def shutdown_event():
     """Clean shutdown: save session summary and stop audio loop."""
     print("\n[SERVER] FastAPI shutdown event triggered...")
     
-    # Phase E3: Save session summary before shutdown
-    if audio_loop and audio_loop.memory_store and last_user_activity:
-        print("[SERVER] Saving session summary before shutdown...")
-        try:
-            await asyncio.wait_for(save_session_summary("Server shutdown"), timeout=2.0)
-        except asyncio.TimeoutError:
-            print("[SESSION SUMMARY] Warning: Save timed out after 2s")
-        except Exception as e:
-            print(f"[SERVER] Error saving session summary: {e}")
+    # Phase E3 + Phase 3: Save session summary before shutdown
+    # Use _svc (ServiceAccessor) for memory_store availability check.
+    # At shutdown time, all Phase 3 objects are fully constructed.
+    try:
+        if _svc.has_memory_store and last_user_activity:
+            print("[SERVER] Saving session summary before shutdown...")
+            try:
+                await asyncio.wait_for(save_session_summary("Server shutdown"), timeout=2.0)
+            except asyncio.TimeoutError:
+                print("[SESSION SUMMARY] Warning: Save timed out after 2s")
+            except Exception as e:
+                print(f"[SERVER] Error saving session summary: {e}")
+    except NameError:
+        # _svc not yet initialized (extremely early shutdown)
+        if audio_loop and audio_loop.memory_store and last_user_activity:
+            print("[SERVER] Saving session summary before shutdown (legacy path)...")
+            try:
+                await asyncio.wait_for(save_session_summary("Server shutdown"), timeout=2.0)
+            except Exception:
+                pass
     
     # Clean up audio loop
     if audio_loop:
@@ -99,6 +110,12 @@ async def shutdown_event():
             audio_loop.stop()
         except Exception as e:
             print(f"[SERVER] Error stopping audio loop: {e}")
+    
+    # Phase 3: Detach from SessionManager if available
+    try:
+        _session_mgr.detach()
+    except (NameError, Exception):
+        pass
     
     print("[SERVER] Shutdown complete.")
 
@@ -109,7 +126,7 @@ async def shutdown_event():
 audio_loop = None
 loop_task = None
 authenticator = None
-kasa_agent = KasaAgent()
+kasa_agent = None  # constructed later from settings (see tool-permission block below)
 SETTINGS_FILE = "settings.json"
 
 # Phase D.1.a: Client connection tracking for heartbeat
@@ -273,7 +290,8 @@ async def save_session_summary(reason: str = "Idle timeout"):
         print(f"[SESSION SUMMARY] Skipped - rate limited (last saved {int((current_time - last_summary_time)/60)} min ago)")
         return
     
-    if not audio_loop or not audio_loop.memory_store:
+    # Phase 3: Use ServiceAccessor to check memory store availability
+    if not _svc.has_memory_store:
         print("[SESSION SUMMARY] Skipped - no memory store available")
         return
     
@@ -281,7 +299,7 @@ async def save_session_summary(reason: str = "Idle timeout"):
     # Simple heuristic: get last few messages and summarize
     try:
         # Get recent memories to understand context
-        recent_memories = audio_loop.memory_store.get_memories(limit=10, update_access=False)
+        recent_memories = _svc.memory_store.get_memories(limit=10, update_access=False)
         
         # Build a simple summary
         summary_parts = []
@@ -310,7 +328,7 @@ async def save_session_summary(reason: str = "Idle timeout"):
             summary_content = summary_content[:697] + "..."
         
         # Save to database
-        memory_id = audio_loop.memory_store.add_memory('session_summary', summary_content)
+        memory_id = _svc.memory_store.add_memory('session_summary', summary_content)
         last_summary_time = current_time
         
         print(f"[SESSION SUMMARY] Saved (ID: {memory_id}): {summary_content[:100]}...")
@@ -501,6 +519,59 @@ else:
     kasa_agent = None
     print("[SERVER] Kasa tools DISABLED - skipping Kasa agent initialization")
 # tool_permissions is now SETTINGS["tool_permissions"]
+
+# ========================================
+# PHASE 1.3: APPLICATION LIFECYCLE
+# ApplicationHost + Bootstrapper own service construction and container
+# wiring that previously lived inline here. This does NOT change any
+# runtime behaviour — the same objects are constructed, in the same order,
+# and registered under the same interfaces as before.
+#
+# IMemoryManager and IWorkspaceManager are owned by AudioLoop (lumina.py)
+# and are registered lazily once AudioLoop is constructed in start_audio();
+# Bootstrapper does not own that registration.
+# ========================================
+from core.container import container
+from core.interfaces import ISmartHomeAgent, IMemoryManager, IWorkspaceManager, IBrainState, IEventBus
+from core.bootstrap import Bootstrapper
+from core.application import ApplicationHost
+
+_bootstrapper = Bootstrapper(container=container, kasa_agent=kasa_agent)
+_app_host = ApplicationHost(container=container, bootstrapper=_bootstrapper)
+_app_host.initialize()
+_app_host.start()
+
+_brain_state = _bootstrapper.brain_state
+_event_bus = _bootstrapper.event_bus
+_context_factory = _bootstrapper.context_factory
+_request_pipeline = _bootstrapper.pipeline  # Phase 1.5 — not connected to any runtime path yet
+# Phase 1.6 — thin adapters coexisting beside legacy globals; unused by any runtime path yet
+_brain_state_adapter = _bootstrapper.brain_state_adapter
+_event_bus_adapter = _bootstrapper.event_bus_adapter
+_pipeline_adapter = _bootstrapper.pipeline_adapter
+# Phase 1.8 — final infrastructure layer; RuntimeFacade + metadata, not wired into runtime
+_service_metadata_registry = _bootstrapper.metadata_registry
+from core.runtime_facade import RuntimeFacade
+_runtime_facade = RuntimeFacade(container)
+
+# ========================================
+# PHASE 3: SESSION MANAGER + SERVICE ACCESSOR
+# ========================================
+# SessionManager centralizes AudioLoop lifecycle ownership,
+# replacing the scattered `global audio_loop` pattern.
+# ServiceAccessor provides DI-first resolution of IMemoryManager,
+# IWorkspaceManager, IKnowledgeManager with AudioLoop fallback.
+from core.session import SessionManager
+from core.service_accessor import ServiceAccessor
+
+_session_mgr = SessionManager(brain_state=_brain_state, event_bus=_event_bus)
+container.register_instance(SessionManager, _session_mgr)
+print("[DI] SessionManager registered")
+
+_svc = ServiceAccessor(container=container, session_manager=_session_mgr)
+container.register_instance(ServiceAccessor, _svc)
+print("[DI] ServiceAccessor registered")
+
 
 # ========================================
 # ACTION ROUTER: Gemini LLM prompt builder (no templates)
@@ -869,6 +940,13 @@ async def disconnect(sid):
     if sid in connected_clients:
         del connected_clients[sid]
 
+    # Phase 2.2: Publish session.disconnected event to EventBus via RuntimeFacade
+    try:
+        await _runtime_facade.event_bus_adapter.publish("session.disconnected", {"client_sid": sid})
+    except Exception as e:
+        print(f"[DI] EventBus disconnect publish failed (non-fatal): {e}")
+
+
 # ========================================
 # TRANSCRIPT AGGREGATOR (FIX A) — kill micro-stores
 # ========================================
@@ -990,9 +1068,7 @@ async def _index_transcript_bg(role: str, content: str, project_name: str = None
 
 async def _flush_transcript_buffer_if_stale():
     """Flush stale transcript buffers (called from idle monitor every 10s)."""
-    proj = None
-    if audio_loop and audio_loop.project_manager:
-        proj = audio_loop.project_manager.current_project
+    proj = _svc.current_project
     for role, text in _transcript_agg.flush_stale():
         asyncio.create_task(_store_transcript(role, text, proj))
 
@@ -1084,14 +1160,17 @@ async def start_audio(sid, data=None):
         # Phase E5: Store transcripts from voice pipeline (non-blocking)
         if memory_engine and _text:
             _role = "assistant" if data.get('sender') == 'Lumina' else "user"
-            _project = audio_loop.project_manager.current_project if (audio_loop and audio_loop.project_manager) else None
+            _project = _svc.current_project
             asyncio.create_task(_index_transcript_bg(_role, _text, _project))
 
     # Callback to send Confirmation Request to frontend
     def on_tool_confirmation(data):
         # data = {"id": "uuid", "tool": "tool_name", "args": {...}}
         print(f"Requesting confirmation for tool: {data.get('tool')}")
+        # Note: pending_confirmation_id is now authoritatively set and cleared inside
+        # AudioLoop (lumina.py) via RuntimeFacade -> BrainStateAdapter -> BrainState.
         asyncio.create_task(sio.emit('tool_confirmation_request', data))
+
 
     # Callback to send CAD status to frontend
     def on_cad_status(status):
@@ -1162,6 +1241,9 @@ async def start_audio(sid, data=None):
             kasa_agent=kasa_agent
         )
         
+        # ── Phase 3: Attach AudioLoop to SessionManager early ──
+        _session_mgr.attach(audio_loop)
+        
         # Phase D.3.a: Apply VAD settings from SETTINGS
         audio_loop.vad_min_speech_ms = SETTINGS.get('vad_min_speech_ms', 350)
         audio_loop.vad_silence_stop_ms = SETTINGS.get('vad_silence_stop_ms', 900)
@@ -1181,21 +1263,36 @@ async def start_audio(sid, data=None):
 
         # Phase E5: Initialize MemoryEngine AFTER MemoryStore has created all tables
         global memory_engine
-        if memory_engine is None and audio_loop.memory_store:
-            db_path = str(audio_loop.memory_store.db_path)
+        if memory_engine is None and _svc.has_memory_store:
+            db_path = str(_svc.memory_store.db_path)
             memory_engine = MemoryEngine(db_path=db_path)
             print(f"[MEMORY2] Engine initialized with DB: {db_path}")
             # Run priority decay on session start
             try:
-                decay_result = memory_engine.run_decay(audio_loop.memory_store)
+                decay_result = memory_engine.run_decay(_svc.memory_store)
                 if decay_result.get("decayed", 0) > 0 or decay_result.get("demoted", 0) > 0:
                     print(f"[MEMORY DECISION] Session start decay: {decay_result}")
             except Exception as e:
                 print(f"[MEMORY2] Decay error on startup: {e}")
 
+        # ── Phase 1.1: Register AudioLoop-owned services into the DI container ──
+        # Use override() instead of register_instance() so session restarts
+        # (audio_loop = None → new AudioLoop) do not throw "already registered".
+        if _svc.has_memory_store:
+            container.override(IMemoryManager, _svc.memory_store)
+            print("[DI] IMemoryManager → MemoryStore registered")
+        if _svc.has_project_manager:
+            container.override(IWorkspaceManager, _svc.project_manager)
+            print("[DI] IWorkspaceManager → ProjectManager registered")
+        if memory_engine:
+            from core.interfaces import IKnowledgeManager
+            container.override(IKnowledgeManager, memory_engine)
+            print("[DI] IKnowledgeManager → MemoryEngine registered")
+
         # Apply current permissions
         audio_loop.update_permissions(SETTINGS["tool_permissions"])
         audio_loop.set_browser_confirmation_mode(SETTINGS.get("browser_confirmation_mode", "relaxed"))
+
 
         # Initialize Persona Engine
         persona_eng = init_persona_engine(SETTINGS)
@@ -1362,6 +1459,8 @@ async def stop_audio(sid):
     if audio_loop:
         audio_loop.stop() 
         print("Stopping Audio Loop")
+        # Phase 3: Detach from SessionManager
+        _session_mgr.detach()
         audio_loop = None
         await sio.emit('status', {'msg': 'Lumina Stopped'})
 
@@ -1388,11 +1487,21 @@ async def confirm_tool(sid, data):
     confirmed = data.get('confirmed', False)
     
     print(f"[SERVER DEBUG] Received confirmation response for {request_id}: {confirmed}")
-    
+
     if audio_loop:
         audio_loop.resolve_tool_confirmation(request_id, confirmed)
     else:
         print("Audio loop not active, cannot resolve confirmation.")
+
+    # Phase 2 (runtime migration): clear the mirrored BrainState confirmation
+    # id via RuntimeFacade/BrainStateAdapter. Additive only — does not affect
+    # the resolution above, which already completed via audio_loop directly.
+    try:
+        with _runtime_facade.brain_state_adapter.transaction() as draft:
+            if draft.pending_confirmation_id == request_id:
+                draft.pending_confirmation_id = None
+    except Exception as e:
+        print(f"[DI] BrainState pending-confirmation clear failed (non-fatal): {e}")
 
 @sio.event
 async def shutdown(sid, data=None):
@@ -1403,8 +1512,8 @@ async def shutdown(sid, data=None):
     print("[SERVER] SHUTDOWN SIGNAL RECEIVED FROM FRONTEND")
     print("[SERVER] ========================================")
     
-    # Phase E3: Save session summary before shutdown
-    if audio_loop and audio_loop.memory_store and last_user_activity:
+    # Phase E3 + Phase 3: Save session summary before shutdown
+    if _svc.has_memory_store and last_user_activity:
         print("[SERVER] Saving session summary before shutdown...")
         try:
             await asyncio.wait_for(save_session_summary("Frontend shutdown"), timeout=2.0)
@@ -1417,6 +1526,8 @@ async def shutdown(sid, data=None):
     if audio_loop:
         print("[SERVER] Stopping Audio Loop...")
         audio_loop.stop()
+        # Phase 3: Detach from SessionManager
+        _session_mgr.detach()
         audio_loop = None
     
     # Cancel the loop task if running
@@ -1429,6 +1540,12 @@ async def shutdown(sid, data=None):
     if authenticator:
         print("[SERVER] Stopping Authenticator...")
         authenticator.stop()
+        
+    # Phase 3: Publish shutdown event via EventBus
+    try:
+        await _runtime_facade.event_bus_adapter.publish("session.shutdown", {"reason": "frontend_shutdown"})
+    except Exception as e:
+        print(f"[DI] EventBus shutdown publish failed (non-fatal): {e}")
     
     print("[SERVER] Frontend shutdown complete.")
 
@@ -1446,6 +1563,12 @@ async def user_input(sid, data):
     idle_disabled_until_ts = last_user_activity + 120.0
     print(f"[IDLE] user_turn ts={last_user_activity:.1f} idle_suppressed_until=+120s")
 
+    # Phase 3: Sync user turn to BrainState
+    try:
+        _brain_state.record_user_turn(text or "", mood_state="calm")
+    except Exception as e:
+        print(f"[DI] BrainState user_turn sync failed (non-fatal): {e}")
+
     # FIX B: Reset persona idle timer on REAL user turn only
     _pe_turn = get_persona_engine()
     if _pe_turn:
@@ -1455,9 +1578,8 @@ async def user_input(sid, data):
     if _transcript_agg.enabled and memory_engine:
         _flushed = _transcript_agg.force_flush("user", reason="user_turn")
         if _flushed:
-            _proj = None
-            if audio_loop and audio_loop.project_manager:
-                _proj = audio_loop.project_manager.current_project
+            # Phase 3: Use ServiceAccessor for project reference
+            _proj = _svc.current_project
             asyncio.create_task(_store_transcript("user", _flushed, _proj))
 
     if not audio_loop:
@@ -1472,7 +1594,7 @@ async def user_input(sid, data):
     # ========================================
     # EARLY INTERCEPT — runs before anything is sent to the LLM.
     # Strips punctuation so voice-transcribed text like "Yeah, lock that in." matches.
-    if audio_loop and audio_loop.memory_store and memory_engine:
+    if _svc.has_memory_store and memory_engine:
         # Normalize: lowercase, strip outer whitespace, remove all punctuation
         _clean = re.sub(r'[^\w\s]', '', text.lower()).strip()
         _clean = re.sub(r'\s+', ' ', _clean)  # collapse whitespace
@@ -1513,7 +1635,7 @@ async def user_input(sid, data):
         
         # For strong phrases without any target, check if pending exists before intercepting
         if (_is_strong_confirm or _is_strong_deny) and not _has_any_target:
-            _pending_check = audio_loop.memory_store.get_by_state("pending", limit=1)
+            _pending_check = _svc.memory_store.get_by_state("pending", limit=1)
             if not _pending_check:
                 _is_confirm = False
                 _is_deny = False
@@ -1527,7 +1649,7 @@ async def user_input(sid, data):
                     audio_loop._revisit_target_id = None
                     if _is_confirm:
                         print(f"[MEMORY REVISIT] Confirm for revisit id={_revisit_id}: \"{text.strip()}\"")
-                        audio_loop.memory_store.promote_memory(_revisit_id, new_state="active", confidence=1.0)
+                        _svc.memory_store.promote_memory(_revisit_id, new_state="active", confidence=1.0)
                         print(f"[MEMORY REVISIT] Re-confirmed active id={_revisit_id}")
                         await sio.emit('memory_lifecycle_event', {
                             'event': 'revisit_confirm', 'id': _revisit_id,
@@ -1536,7 +1658,7 @@ async def user_input(sid, data):
                         }, room=sid)
                     else:
                         print(f"[MEMORY REVISIT] Deny for revisit id={_revisit_id}: \"{text.strip()}\"")
-                        audio_loop.memory_store.demote_memory(_revisit_id, new_state="dormant")
+                        _svc.memory_store.demote_memory(_revisit_id, new_state="dormant")
                         print(f"[MEMORY REVISIT] Retired id={_revisit_id}")
                         await sio.emit('memory_lifecycle_event', {
                             'event': 'revisit_retire', 'id': _revisit_id,
@@ -1554,7 +1676,7 @@ async def user_input(sid, data):
                     audio_loop._current_pending_consent_type = None
                     if _is_confirm:
                         print(f"[MEMORY DECISION] Confirm for consent id={_consent_id}: \"{text.strip()}\"")
-                        audio_loop.memory_store.promote_memory(_consent_id, new_state="active", confidence=1.0)
+                        _svc.memory_store.promote_memory(_consent_id, new_state="active", confidence=1.0)
                         print(f"[MEMORY DECISION] Promoted pending->active id={_consent_id}")
                         await sio.emit('memory_lifecycle_event', {
                             'event': 'promoted', 'id': _consent_id,
@@ -1563,7 +1685,7 @@ async def user_input(sid, data):
                         }, room=sid)
                     else:
                         print(f"[MEMORY DECISION] Deny for consent id={_consent_id}: \"{text.strip()}\"")
-                        audio_loop.memory_store.demote_memory(_consent_id, new_state="dormant")
+                        _svc.memory_store.demote_memory(_consent_id, new_state="dormant")
                         print(f"[MEMORY DECISION] Demoted pending->dormant id={_consent_id}")
                         await sio.emit('memory_lifecycle_event', {
                             'event': 'demoted', 'id': _consent_id,
@@ -1573,12 +1695,12 @@ async def user_input(sid, data):
                     return  # Do NOT forward to LLM
 
                 # Priority 3: Fallback to most recent pending (strong phrases only reach here)
-                recent_pending = audio_loop.memory_store.get_by_state("pending", limit=1)
+                recent_pending = _svc.memory_store.get_by_state("pending", limit=1)
                 if recent_pending:
                     mem = recent_pending[0]
                     if _is_confirm:
                         print(f"[MEMORY DECISION] Confirm (fallback) for id={mem['id']}: \"{text.strip()}\"")
-                        audio_loop.memory_store.promote_memory(mem['id'], new_state="active", confidence=1.0)
+                        _svc.memory_store.promote_memory(mem['id'], new_state="active", confidence=1.0)
                         print(f"[MEMORY DECISION] Promoted pending->active id={mem['id']} type={mem['type']}")
                         await sio.emit('memory_lifecycle_event', {
                             'event': 'promoted', 'id': mem['id'],
@@ -1587,7 +1709,7 @@ async def user_input(sid, data):
                         }, room=sid)
                     else:
                         print(f"[MEMORY DECISION] Deny (fallback) for id={mem['id']}: \"{text.strip()}\"")
-                        audio_loop.memory_store.demote_memory(mem['id'], new_state="dormant")
+                        _svc.memory_store.demote_memory(mem['id'], new_state="dormant")
                         print(f"[MEMORY DECISION] Demoted pending->dormant id={mem['id']} type={mem['type']}")
                         await sio.emit('memory_lifecycle_event', {
                             'event': 'demoted', 'id': mem['id'],
@@ -1604,7 +1726,7 @@ async def user_input(sid, data):
     # PHASE T3: EXPLICIT REVISIT CUE DETECTION
     # ========================================
     # Only triggers on explicit user cue — never unsolicited.
-    if audio_loop and audio_loop.memory_store:
+    if _svc.has_memory_store:
         _revisit_cues = [
             "what do you remember", "check my preferences", "review my memories",
             "remember what i like", "what do i like", "what have you remembered",
@@ -1620,7 +1742,7 @@ async def user_input(sid, data):
             else:
                 try:
                     cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
-                    all_active = audio_loop.memory_store.get_by_state("active", limit=50)
+                    all_active = _svc.memory_store.get_by_state("active", limit=50)
                     stale = [m for m in all_active
                              if m.get('type') in ('preference', 'intent')
                              and m.get('created_at', '') < cutoff]
@@ -1671,8 +1793,8 @@ async def user_input(sid, data):
             return
         
         try:
-            if audio_loop and audio_loop.memory_store:
-                memory_id = audio_loop.memory_store.add_memory(memory_type, content)
+            if _svc.has_memory_store:
+                memory_id = _svc.memory_store.add_memory(memory_type, content)
                 await sio.emit('chat_message', {
                     'sender': 'System',
                     'text': f'✅ Saved to memory ({memory_type}): {content}'
@@ -1695,8 +1817,8 @@ async def user_input(sid, data):
     # /memory command: list recent memories
     if text.strip() == '/memory':
         try:
-            if audio_loop and audio_loop.memory_store:
-                memories = audio_loop.memory_store.get_memories(limit=20, update_access=False)
+            if _svc.has_memory_store:
+                memories = _svc.memory_store.get_memories(limit=20, update_access=False)
                 
                 if memories:
                     memory_lines = ["📝 Recent Memories:"]
@@ -1729,12 +1851,12 @@ async def user_input(sid, data):
     # Phase E3: /save_summary command: manually trigger session summary save for testing
     if text.strip() == '/save_summary':
         try:
-            if audio_loop and audio_loop.memory_store:
+            if _svc.has_memory_store:
                 print("[SERVER] Manual session summary save triggered via /save_summary")
                 await save_session_summary("Manual test trigger")
                 
                 # Get the latest summary to confirm
-                latest = audio_loop.memory_store.get_latest_session_summary()
+                latest = _svc.memory_store.get_latest_session_summary()
                 if latest:
                     await sio.emit('chat_message', {
                         'sender': 'System',
@@ -1997,21 +2119,21 @@ async def user_input(sid, data):
     # ========================================
     # Preferences/facts detected by extract_memory_candidates are stored
     # directly as state=pending. User confirms via voice/text, not popup.
-    if audio_loop and audio_loop.memory_store:
+    if _svc.has_memory_store:
         try:
             candidates = extract_memory_candidates(text, context="user")
             
             if candidates:
                 for candidate in candidates:
                     # Check for duplicates
-                    existing = audio_loop.memory_store.search_memories(candidate['content'], limit=3)
+                    existing = _svc.memory_store.search_memories(candidate['content'], limit=3)
                     is_duplicate = any(candidate['content'].lower() in m['content'].lower() or 
                                       m['content'].lower() in candidate['content'].lower() 
                                       for m in existing)
                     
                     if not is_duplicate:
                         # Auto-store as pending — no popup, no socket emit
-                        mem_id = audio_loop.memory_store.add_memory(
+                        mem_id = _svc.memory_store.add_memory(
                             memory_type=candidate['type'],
                             content=candidate['content'],
                             metadata={"source": "auto_extract", "reason": candidate['reason']},
@@ -2041,9 +2163,9 @@ async def user_input(sid, data):
     # MEMORY LIFECYCLE: DETECT INTENTS & ASSUMPTIONS
     # ========================================
     memory_signals = []
-    if audio_loop and audio_loop.memory_store and memory_engine:
+    if _svc.has_memory_store and memory_engine:
         try:
-            memory_signals = memory_engine.detect_memory_signals(text, audio_loop.memory_store)
+            memory_signals = memory_engine.detect_memory_signals(text, _svc.memory_store)
             _ts = datetime.utcnow().isoformat()
             for sig in memory_signals:
                 # Track for consent (last one wins if multiple, but typically only one per message)
@@ -2062,9 +2184,7 @@ async def user_input(sid, data):
     # ========================================
     # PHASE E5: STORE USER TRANSCRIPT + INDEX
     # ========================================
-    current_project = None
-    if audio_loop and audio_loop.project_manager:
-        current_project = audio_loop.project_manager.current_project
+    current_project = _svc.current_project
     if memory_engine:
         asyncio.create_task(_index_transcript_bg("user", text, current_project))
 
@@ -2075,10 +2195,10 @@ async def user_input(sid, data):
     memory_context = ""
     injected_memory_ids = []
     
-    if audio_loop and audio_loop.memory_store:
+    if _svc.has_memory_store:
         try:
             from persona_engine import get_persona_engine as _get_pe, PersonaEngine
-            ms = audio_loop.memory_store
+            ms = _svc.memory_store
             _pe = _get_pe()
 
             # --- Compute retrieval budget from persona engine ---
@@ -2267,8 +2387,8 @@ async def user_input(sid, data):
     print(f"[SERVER DEBUG] Message role: user (Gemini Live doesn't support separate system messages per turn)")
     
     # Log User Input to Project History
-    if audio_loop and audio_loop.project_manager:
-        audio_loop.project_manager.log_chat("User", text)
+    if _svc.has_project_manager:
+        _svc.project_manager.log_chat("User", text)
         
     # Use the same 'send' method that worked for audio, as 'send_realtime_input' and 'send_client_content' seem unstable in this env
     # INJECT VIDEO FRAME IF AVAILABLE (VAD-style logic for Text Input)
@@ -2471,7 +2591,7 @@ async def iterate_cad(sid, data):
         await sio.emit('cad_status', {'status': 'generating'})
         
         # Call the agent with project path
-        cad_output_dir = str(audio_loop.project_manager.get_current_project_path() / "cad")
+        cad_output_dir = str(_svc.project_manager.get_current_project_path() / "cad")
         result = await audio_loop.cad_agent.iterate_prototype(prompt, output_dir=cad_output_dir)
         
         if result:
@@ -2480,7 +2600,7 @@ async def iterate_cad(sid, data):
             await sio.emit('cad_data', result)
             # Save to Project
             if 'file_path' in result:
-                saved_path = audio_loop.project_manager.save_cad_artifact(result['file_path'], prompt)
+                saved_path = _svc.project_manager.save_cad_artifact(result['file_path'], prompt)
                 if saved_path:
                     print(f"[SERVER] Saved iterated CAD to {saved_path}")
 
@@ -2506,8 +2626,14 @@ async def generate_cad(sid, data):
         await sio.emit('status', {'msg': 'Generating new design...'})
         await sio.emit('cad_status', {'status': 'generating'})
         
-        # Use generate_prototype based on prompt with project path
-        cad_output_dir = str(audio_loop.project_manager.get_current_project_path() / "cad")
+        # Use generate_prototype based on prompt with project path resolved via WorkspaceManager
+        try:
+            workspace_mgr = _runtime_facade.workspace_manager
+            project_path = workspace_mgr.get_current_project_path()
+        except Exception:
+            project_path = _svc.project_manager.get_current_project_path()
+            
+        cad_output_dir = str(project_path / "cad")
         result = await audio_loop.cad_agent.generate_prototype(prompt, output_dir=cad_output_dir)
         
         if result:
@@ -2518,7 +2644,7 @@ async def generate_cad(sid, data):
 
             # Save to Project
             if 'file_path' in result:
-                saved_path = audio_loop.project_manager.save_cad_artifact(result['file_path'], prompt)
+                saved_path = _svc.project_manager.save_cad_artifact(result['file_path'], prompt)
                 if saved_path:
                     print(f"[SERVER] Saved generated CAD to {saved_path}")
 
@@ -2707,8 +2833,8 @@ async def print_stl(sid, data):
         
         # Get current project path for resolution
         current_project_path = None
-        if audio_loop and audio_loop.project_manager:
-            current_project_path = str(audio_loop.project_manager.get_current_project_path())
+        if _svc.has_project_manager:
+            current_project_path = str(_svc.project_manager.get_current_project_path())
             print(f"[SERVER DEBUG] Using project path: {current_project_path}")
 
         # Resolve STL path before slicing so we can preview it
@@ -2976,6 +3102,27 @@ async def list_quests(sid, data=None):
 
 @sio.event
 async def create_quest(sid, data):
+    # Phase 2.3: Resolve a fresh execution context adapter and derive request-level context
+    ctx = _runtime_facade.new_execution_context_adapter().child(
+        client_sid=sid,
+        metadata={"event": "create_quest", "title": data.get("title")}
+    )
+    print(f"[TRACE] create_quest starting - context_id={ctx.context_id} correlation_id={ctx.correlation_id}")
+    
+    # Phase 2.4: Execute request through the RequestPipeline
+    from core.pipeline import PipelineContext
+    brain_snap = _runtime_facade.brain_state_adapter.snapshot()
+    pipeline_ctx = PipelineContext(
+        execution_context=ctx._execution_context,
+        brain_snapshot=brain_snap,
+        request_metadata={"event": "create_quest", "title": data.get("title")}
+    )
+    try:
+        pipeline_ctx = await _runtime_facade.pipeline.execute(pipeline_ctx)
+        print(f"[TRACE] create_quest pipeline executed - context_id={ctx.context_id} is_cancelled={pipeline_ctx.is_cancelled}")
+    except Exception as pe:
+        print(f"[TRACE] create_quest pipeline failed (non-fatal) - error={pe}")
+
     store = _get_memory_store()
     try:
         quest = store.create_quest(
@@ -2984,10 +3131,14 @@ async def create_quest(sid, data):
             priority=data.get("priority", "medium"),
             status=data.get("status", "active"),
         )
+        print(f"[TRACE] create_quest finished successfully - context_id={ctx.context_id}")
         await sio.emit("quest_created", quest)
     except Exception as e:
+        print(f"[TRACE] create_quest failed - context_id={ctx.context_id} error={e}")
         print(f"[PANEL] create_quest error: {e}")
         await sio.emit("panel_error", {"panel": "quests", "error": str(e)}, to=sid)
+
+
 
 @sio.event
 async def update_quest(sid, data):
@@ -3263,7 +3414,9 @@ async def get_memories(sid, data=None):
         "limit": 10 (optional)
     }
     """
-    if not audio_loop or not audio_loop.memory_store:
+    try:
+        mgr = _runtime_facade.memory_manager
+    except Exception:
         await sio.emit('error', {'msg': "Memory store not available"})
         return
     
@@ -3271,12 +3424,13 @@ async def get_memories(sid, data=None):
         memory_type = data.get('type') if data else None
         limit = data.get('limit', 10) if data else 10
         
-        memories = audio_loop.memory_store.get_memories(memory_type, limit, update_access=False)
+        memories = mgr.get_memories(memory_type, limit, update_access=False)
         await sio.emit('memories', {'memories': memories})
         
     except Exception as e:
         print(f"Error getting memories: {e}")
         await sio.emit('error', {'msg': f"Failed to get memories: {str(e)}"})
+
 
 @sio.event
 async def get_memory_stats(sid):

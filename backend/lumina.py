@@ -25,6 +25,9 @@ if sys.version_info < (3, 11, 0):
 from tools import tools_list
 from actions import ACTION_REGISTRY  # Phase M: Mark-XXX integrated actions
 from core.registry import ToolDispatcherRegistry
+from core.runtime_facade import RuntimeFacade
+from core.container import container
+
 
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
@@ -408,6 +411,7 @@ class AudioLoop:
         self.web_agent = None  # Disabled: WebAgent()
         self.kasa_agent = kasa_agent if kasa_agent else KasaAgent()
         self.printer_agent = PrinterAgent()
+        self._facade = RuntimeFacade(container)
 
         self.send_text_task = None
         self.stop_event = asyncio.Event()
@@ -592,7 +596,12 @@ class AudioLoop:
     def flush_chat(self):
         """Forces the current chat buffer to be written to log."""
         if self.chat_buffer["sender"] and self.chat_buffer["text"].strip():
-            self.project_manager.log_chat(self.chat_buffer["sender"], self.chat_buffer["text"])
+            # Phase 2.8: Use IWorkspaceManager via RuntimeFacade to log chat
+            try:
+                workspace_mgr = self._facade.workspace_manager
+                workspace_mgr.log_chat(self.chat_buffer["sender"], self.chat_buffer["text"])
+            except Exception:
+                self.project_manager.log_chat(self.chat_buffer["sender"], self.chat_buffer["text"])
             self._broadcast_log(self.chat_buffer["sender"], self.chat_buffer["text"])
             self.chat_buffer = {"sender": None, "text": ""}
         # Reset transcription tracking for new turn
@@ -1237,6 +1246,13 @@ class AudioLoop:
                                     future = asyncio.Future()
                                     self._pending_confirmations[request_id] = future
                                     
+                                    # Phase 2.1: Write pending confirmation ID to BrainState using the RuntimeFacade
+                                    try:
+                                        with self._facade.brain_state_adapter.transaction() as draft:
+                                            draft.pending_confirmation_id = request_id
+                                    except Exception as e:
+                                        print(f"[DI] BrainState pending-confirmation set failed (non-fatal): {e}")
+
                                     self.on_tool_confirmation({
                                         "id": request_id, 
                                         "tool": fc.name, 
@@ -1246,9 +1262,15 @@ class AudioLoop:
                                     try:
                                         # Wait for user response
                                         confirmed = await future
-
                                     finally:
                                         self._pending_confirmations.pop(request_id, None)
+                                        # Phase 2.1: Clear pending confirmation ID in BrainState using the RuntimeFacade
+                                        try:
+                                            with self._facade.brain_state_adapter.transaction() as draft:
+                                                if draft.pending_confirmation_id == request_id:
+                                                    draft.pending_confirmation_id = None
+                                        except Exception as e:
+                                            print(f"[DI] BrainState pending-confirmation clear failed (non-fatal): {e}")
 
                                     print(f"[LUMINA DEBUG] [CONFIRM] Request {request_id} resolved. Confirmed: {confirmed}")
 

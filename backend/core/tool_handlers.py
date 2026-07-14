@@ -93,7 +93,12 @@ async def handle_switch_project(fc, loop) -> dict:
 @ToolDispatcherRegistry.register("list_projects")
 async def handle_list_projects(fc, loop) -> dict:
     print(f"[LUMINA DEBUG] [TOOL] Tool Call: 'list_projects'")
-    projects = loop.project_manager.list_projects()
+    # Phase 2.7: Resolve IWorkspaceManager via RuntimeFacade to list projects
+    try:
+        workspace_mgr = loop._facade.workspace_manager
+        projects = workspace_mgr.list_projects()
+    except Exception:
+        projects = loop.project_manager.list_projects()
     return {"result": f"Available projects: {', '.join(projects)}"}
 
 # --- Smart Home ---
