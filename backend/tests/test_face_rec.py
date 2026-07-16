@@ -21,7 +21,11 @@ try:
 
     print("Loading actual reference.jpg using CV2...")
     # image = face_recognition.load_image_file("backend/reference.jpg") # This uses PIL
-    img_bgr = cv2.imread("backend/reference.jpg")
+    import os
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(script_dir)) if os.path.basename(script_dir) == "tests" else os.path.dirname(script_dir)
+    ref_path = os.path.join(project_root, "backend", "reference.jpg")
+    img_bgr = cv2.imread(ref_path)
     if img_bgr is None:
         raise ValueError("Failed to load image with cv2")
     image = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)

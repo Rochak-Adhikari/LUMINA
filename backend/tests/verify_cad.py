@@ -3,7 +3,9 @@ import os
 import sys
 
 # Add current directory to path so we can import modules
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(backend_dir)
+os.chdir(backend_dir)
 
 from cad_agent import CadAgent
 

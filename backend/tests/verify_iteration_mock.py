@@ -128,12 +128,14 @@ export_stl(result_part, 'output.stl')
 
 if __name__ == "__main__":
     # Ensure backend directory is current working directory for imports
-    if os.path.basename(os.getcwd()) != "backend":
-        if os.path.exists("backend"):
-            os.chdir("backend")
-            print(f"Changed working directory to {os.getcwd()}")
-        else:
-            print("Warning: Could not find backend directory.")
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if os.path.basename(current_dir) == "tests":
+        backend_dir = os.path.dirname(current_dir)
+        os.chdir(backend_dir)
+        print(f"Changed working directory to {backend_dir}")
+    elif os.path.basename(os.getcwd()) != "backend" and os.path.exists("backend"):
+        os.chdir("backend")
+        print(f"Changed working directory to {os.getcwd()}")
 
     try:
         asyncio.run(verify())

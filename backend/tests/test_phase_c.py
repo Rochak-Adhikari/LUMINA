@@ -19,7 +19,7 @@ import os
 import sqlite3
 
 # Add backend to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from memory_store import MemoryStore
 
@@ -32,7 +32,7 @@ def test_database_exists():
     """Test 1: Ensure memory database exists"""
     print_header("TEST 1: Database Existence")
     
-    db_path = "lumina_memory.db"
+    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lumina_memory.db")
     
     if not os.path.exists(db_path):
         print(f"❌ FAILED: Database not found at {db_path}")
@@ -70,7 +70,7 @@ def test_identity_memories():
     """Test 2: Ensure identity memories are present and retrievable"""
     print_header("TEST 2: Identity Memories Present")
     
-    db_path = "lumina_memory.db"
+    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lumina_memory.db")
     store = MemoryStore(db_path)
     
     try:
@@ -116,7 +116,7 @@ def test_relevant_memory_retrieval():
     """Test 3: Test relevant memory retrieval with identity query"""
     print_header("TEST 3: Relevant Memory Retrieval")
     
-    db_path = "lumina_memory.db"
+    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lumina_memory.db")
     store = MemoryStore(db_path)
     
     test_queries = [
@@ -161,7 +161,7 @@ def test_memory_injection_format():
     """Test 4: Simulate message assembly and verify format"""
     print_header("TEST 4: Memory Injection Format")
     
-    db_path = "lumina_memory.db"
+    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lumina_memory.db")
     store = MemoryStore(db_path)
     
     try:
@@ -260,7 +260,7 @@ def test_identity_always_included():
     """Test 5: Verify identity memories are ALWAYS included regardless of relevance"""
     print_header("TEST 5: Identity Always Included")
     
-    db_path = "lumina_memory.db"
+    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lumina_memory.db")
     store = MemoryStore(db_path)
     
     # Test with a query that has no relevance to identity

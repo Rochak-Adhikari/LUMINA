@@ -5,7 +5,7 @@ Run: conda activate lumina; python test_runtime_stability.py
 import time
 import sys
 import os
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ============================================================
 # TEST 1: TranscriptAggregator — micro-fragment batching
