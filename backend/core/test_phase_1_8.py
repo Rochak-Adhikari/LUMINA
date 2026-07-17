@@ -38,7 +38,7 @@ def section(title: str) -> None:
 def run() -> None:
     from core.container import DependencyContainer
     from core.bootstrap import Bootstrapper
-    from core.interfaces import IBrainState, IEventBus, IPipeline
+    from core.interfaces import IBrainState, IEventBus, IPipeline, IMemoryManager, IWorkspaceManager
     from core.context import ExecutionContextFactory
     from core.adapters import (
         BrainStateAdapter,
@@ -92,10 +92,16 @@ def run() -> None:
     c = _bootstrapped_container()
     registry = c.resolve(ServiceMetadataRegistry)
     check(isinstance(registry, ServiceMetadataRegistry), "ServiceMetadataRegistry resolves from container")
-    check(len(registry) == 8, "metadata registry describes all 8 infrastructure services")
+    check(len(registry) == 10, "metadata registry describes all 10 infrastructure services")
     brain_md = registry.get(repr(IBrainState))
     check(brain_md is not None and brain_md.name == "BrainState", "BrainState metadata present and named")
     check(brain_md.owner == "Phase 1.2", "BrainState metadata records owning phase")
+    mem_md = registry.get(repr(IMemoryManager))
+    check(mem_md is not None and mem_md.name == "MemoryStore", "MemoryStore metadata present and named")
+    check(mem_md is not None and mem_md.owner == "Phase 4.2", "MemoryStore metadata records owning phase (4.2)")
+    proj_md = registry.get(repr(IWorkspaceManager))
+    check(proj_md is not None and proj_md.name == "ProjectManager", "ProjectManager metadata present and named")
+    check(proj_md is not None and proj_md.owner == "Phase 4.2", "ProjectManager metadata records owning phase (4.2)")
     ctx_md = registry.get(repr(ExecutionContextAdapter))
     check(
         ctx_md is not None and ctx_md.lifecycle == LIFECYCLE_TRANSIENT,

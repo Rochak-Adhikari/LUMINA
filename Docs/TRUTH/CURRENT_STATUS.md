@@ -42,7 +42,7 @@ The backend application follows a clean, decoupled dependency-injected design:
 | **Phase 1** | Runtime Foundation | ✅ Completed | Dependency Injection container (`core/container.py`), Application bootstrapper (`core/bootstrap.py`), Lifecycle hosting (`core/application.py`), and Context mapping (`core/context.py`) are implemented and verified via unit tests. |
 | **Phase 2** | Brain Architecture | 🟡 Partially Complete | The sandbox state class (`brain/state.py`) and pub/sub event bus (`brain/events.py`) are implemented and tested, but their full integration within the active server routes remains incomplete due to legacy global state dependencies, inline constructor instantiation of resource managers, and hardcoded socket ports. |
 | **Phase 3** | Interface Refactor & Clean Architecture | 🟡 Partially Complete | The `SessionManager` (`core/session.py`) and `ServiceAccessor` (`core/service_accessor.py`) interfaces are implemented, but the active backend execution path (`server.py`, `lumina.py`) has not yet been fully refactored to route queries and loops exclusively through these abstractions, bypassing them in favor of legacy globals. |
-| **Phase 4** | **Stable Runtime Recovery** | 🟡 In Progress | **Current Phase**. Milestone 4.1 (graceful port recovery) is complete: startup keeps port 8000 when free and scans 8001–8009 only when 8000 is occupied. Remaining milestones (4.2–4.5) still pending. |
+| **Phase 4** | **Stable Runtime Recovery** | 🟡 In Progress | **Current Phase**. Milestones 4.1 (graceful port recovery), 4.1.1 (Electron dynamic port discovery and redirection), and 4.2 (dependency injection for AudioLoop) are complete. Remaining milestones (4.3–4.5) still pending. |
 | **Phase 5** | Memory Engine | ❌ Not Started | Planned future phase. Focuses on semantic memory storage, local vector search indexes, knowledge graph structures, and project/workspace context maps. |
 | **Phase 6** | Planning Engine | ❌ Not Started | Planned future phase. Focuses on structured task decomposition, reasoning chains, dynamic tool binding, and adaptive execution planners. |
 
@@ -53,7 +53,7 @@ The backend application follows a clean, decoupled dependency-injected design:
 Every item below represents a verified dependency or architectural gap present in the current codebase:
 
 *   **Multiple MemoryStore Instances**: `server.py` implements its own cached `_fallback_memory_store` pointing directly to `"lumina_memory.db"`, while `AudioLoop` (`lumina.py`) constructs its own separate connection at startup, resulting in redundant SQLite connection handles and bypassing the DI registration.
-*   **AudioLoop Constructs Dependencies Inline**: `AudioLoop.__init__` instantiates `MemoryStore` and `ProjectManager` directly on disk rather than resolving them via the DI container or accepting them as constructor arguments.
+*   **AudioLoop Constructs Dependencies Inline** ✅ *Resolved (Milestone 4.2)*: `AudioLoop.__init__` now accepts `MemoryStore` and `ProjectManager` dependencies dynamically, falling back to the DI container and then inline instantiation.
 *   **Remaining server.py Globals**: Core states (`audio_loop`, `loop_task`, `authenticator`, `kasa_agent`) are declared as globals in `server.py` and modified directly by event handlers instead of being managed inside `SessionManager`.
 *   **Port Recovery** ✅ *Resolved (Milestone 4.1)*: The startup routine previously ran `uvicorn.run` hardcoded to port `8000` with no recovery. It now keeps 8000 when free and scans 8001–8009 only when 8000 is occupied, logging each decision.
 *   **Legacy Shutdown Path**: `server.py` uses legacy shutdown paths in `shutdown_event()` that directly reference `audio_loop` globals instead of cleanly routing the teardown through the DI-resolved `SessionManager`.
@@ -70,15 +70,15 @@ The objective of Phase 4 is to eliminate the technical debt identified above, st
 *   **Files changed**: `backend/server.py` (module-scope `is_port_free` / `select_startup_port` helpers + `__main__` entrypoint), `backend/tests/test_port_recovery.py` (new regression test).
 *   **Delivered**: Port 8000 is preserved when free; only when occupied does startup scan 8001–8009 for the first free port. Descriptive `[STARTUP]` console output on free/occupied/recovered/failure. Range exhaustion raises an explicit `OSError` instead of an opaque uvicorn bind crash. The probe intentionally omits `SO_REUSEADDR` so it matches uvicorn's real bind on Windows.
 *   **Verification**: 6/6 regression tests pass (stdlib `unittest`). Live probe confirmed: 8000 free → binds 8000; 8000 occupied → recovers to 8001.
-*   **Note**: Frontend (`Ui_TEST/AppTest.jsx`) and Electron (`electron/main.js`) still hardcode `localhost:8000`; keeping 8000 canonical when free preserves that contract. Wiring clients to a recovered port is out of scope for 4.1.
+*   **Note**: Electron (`electron/main.js`) dynamically discovers the recovered backend port via stdout parsing or sequential status scanning on ports 8000-8009 and redirects port 8000 traffic using `session.defaultSession.webRequest.onBeforeRequest` (Milestone 4.1.1).
 *   **Dependencies**: Phase 1 container setup.
 
-### Milestone 4.2: Dependency Injection for AudioLoop
+### Milestone 4.2: Dependency Injection for AudioLoop ✅ Complete
 *   **Objective**: Refactor `AudioLoop` initialization to receive its `MemoryStore` and `ProjectManager` dependencies dynamically via dependency injection, resolving inline constructor instantiation.
-*   **Files expected to change**: `backend/lumina.py`, `backend/core/bootstrap.py`
-*   **Expected deliverables**: Refactored `AudioLoop` constructor accepting dependency interfaces, updated container registry to manage their lifecycles.
-*   **Verification criteria**: Successful DI container boot and instantiation of `AudioLoop` using injected dependencies.
-*   **Dependencies**: Phase 1 DI container.
+*   **Files changed**: `backend/lumina.py`, `backend/core/bootstrap.py`, `backend/server.py`, `backend/tests/test_phase_4_2.py`
+*   **Delivered**: `AudioLoop` constructor refactored to accept optional `memory_store` and `project_manager` parameters with a fallback resolution chain (args -> DI container -> inline). `bootstrap.py` registers `MemoryStore` and `ProjectManager` in the container. `server.py` resolves and passes them.
+*   **Verification**: Dedicated regression suite `backend/tests/test_phase_4_2.py` (3/3 pass: constructor injection, DI-container resolution, inline fallback). Architecture test `core/test_phase_1_8.py` updated for the canonical 10-service registry, including explicit Phase 4.2 metadata checks (all pass). Phase suites `core/test_phase_1_4`–`1_7` and `brain/test_phase_2_1` pass; `backend/tests/test_port_recovery` 6/6 pass. Pytest-based suites in `backend/tests/` remain unexecuted (pytest not installed in the lumina env).
+*   **Dependencies**: Phase 1 container setup.
 
 ### Milestone 4.3: Decouple Global State & Wire SessionManager
 *   **Objective**: Eradicate the scattered global variables (`audio_loop`, `loop_task`, `authenticator`, `kasa_agent`) inside `server.py` by fully routing loop lifecycle and state queries through `SessionManager`.
