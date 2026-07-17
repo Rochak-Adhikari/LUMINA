@@ -105,6 +105,44 @@ class RuntimeFacade:
         """Resolve the registered ApplicationHost for unified lifecycle."""
         return services.get_application_host(self._container)
 
+    # ---- Phase 5.1: Cognitive Architecture ------------------------------
+
+    @property
+    def brain_core(self) -> Any:
+        """
+        Resolve the registered IBrainCore (BrainCore skeleton).
+
+        Resolved directly from the container (import kept local to avoid
+        widening core/services.py in Phase 5.1 — the free-function accessor
+        can be added when a runtime path actually consumes BrainCore).
+        """
+        from brain.core.interfaces import IBrainCore
+        return self._container.resolve(IBrainCore)
+
+    @property
+    def context_builder(self) -> Any:
+        """Resolve the registered IContextBuilder (Phase 5.1)."""
+        from brain.core.interfaces import IContextBuilder
+        return self._container.resolve(IContextBuilder)
+
+    @property
+    def planner(self) -> Any:
+        """Resolve the registered IPlanner (Phase 5.2: RulePlanner)."""
+        from brain.core.interfaces import IPlanner
+        return self._container.resolve(IPlanner)
+
+    @property
+    def skill_registry(self) -> Any:
+        """Resolve the registered SkillRegistry (Phase 5.2)."""
+        from brain.skills.registry import SkillRegistry
+        return self._container.resolve(SkillRegistry)
+
+    @property
+    def skill_manager(self) -> Any:
+        """Resolve the registered SkillManager (Phase 5.2)."""
+        from brain.skills.manager import SkillManager
+        return self._container.resolve(SkillManager)
+
     # ---- Adapters ------------------------------------------------------
 
     @property

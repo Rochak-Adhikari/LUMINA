@@ -58,6 +58,11 @@ class Bootstrapper:
         self.event_bus_adapter: Optional[EventBusAdapter] = None
         self.pipeline_adapter: Optional[PipelineAdapter] = None
         self.metadata_registry: Optional[ServiceMetadataRegistry] = None
+        self.context_builder: Optional[Any] = None
+        self.brain_core: Optional[Any] = None
+        self.planner: Optional[Any] = None
+        self.skill_registry: Optional[Any] = None
+        self.skill_manager: Optional[Any] = None
 
     def bootstrap(self) -> None:
         """Construct and register all services owned by this bootstrapper."""
@@ -70,6 +75,8 @@ class Bootstrapper:
         self._register_execution_context_factory()
         self._register_pipeline()
         self._register_adapters()
+        self._register_brain_core()
+        self._register_planning_and_skills()
         self._register_service_metadata()
 
         # Phase 4.5: Register ApplicationHost as a singleton so it's accessible
@@ -186,6 +193,65 @@ class Bootstrapper:
             lambda: ExecutionContextAdapter(self.context_factory.create()),
         )
         print("[DI] ExecutionContextAdapter registered (transient)")
+
+    def _register_brain_core(self) -> None:
+        """
+        Phase 5.1: Register the cognitive skeleton — ContextBuilder and
+        BrainCore — under their interfaces.
+
+        Imported locally (like MemoryStore/ProjectManager above) to keep
+        module import order flat. No runtime path resolves IBrainCore yet;
+        this is scaffolding for Phase 5.2+.
+        """
+        from brain.core.interfaces import IBrainCore, IContextBuilder
+        from brain.core.context_builder import ContextBuilder
+        from brain.core.brain_core import BrainCore
+
+        self.context_builder = ContextBuilder(brain_state=self.brain_state)
+        self._container.register_instance(IContextBuilder, self.context_builder)
+        print("[DI] IContextBuilder -> ContextBuilder registered")
+
+        self.brain_core = BrainCore(
+            context_builder=self.context_builder,
+            event_bus=self.event_bus,
+        )
+        self._container.register_instance(IBrainCore, self.brain_core)
+        print("[DI] IBrainCore -> BrainCore registered")
+
+    def _register_planning_and_skills(self) -> None:
+        """
+        Phase 5.2: Register the deterministic planning + skill layer.
+
+        - IPlanner        -> RulePlanner (deterministic, no AI)
+        - SkillRegistry   -> metadata registry seeded with builtin specs
+        - SkillManager    -> dispatch with an UNBOUND LegacyToolExecutor
+                             (no runtime wiring in 5.2 — execution is inert)
+
+        Local imports, no runtime consumers, no metadata records (keeps the
+        Phase 1.8 registry count stable).
+        """
+        from brain.core.interfaces import IPlanner
+        from brain.planning.rule_planner import RulePlanner
+        from brain.skills.registry import SkillRegistry
+        from brain.skills.manager import SkillManager
+        from brain.skills.executors.legacy_tool_executor import LegacyToolExecutor
+        from brain.skills.builtin import seed_registry
+
+        self.planner = RulePlanner()
+        self._container.register_instance(IPlanner, self.planner)
+        print("[DI] IPlanner -> RulePlanner registered")
+
+        self.skill_registry = SkillRegistry()
+        seeded = seed_registry(self.skill_registry)
+        self._container.register_instance(SkillRegistry, self.skill_registry)
+        print(f"[DI] SkillRegistry registered ({seeded} builtin skills seeded)")
+
+        self.skill_manager = SkillManager(
+            registry=self.skill_registry,
+            executors=[LegacyToolExecutor(dispatch=None)],
+        )
+        self._container.register_instance(SkillManager, self.skill_manager)
+        print("[DI] SkillManager registered (legacy executor unbound)")
 
     def _register_service_metadata(self) -> None:
         """
