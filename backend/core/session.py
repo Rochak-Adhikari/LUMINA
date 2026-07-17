@@ -54,6 +54,11 @@ class SessionManager:
         self._lock = threading.Lock()
         self._audio_loop: Any = None
         self._attached_at: Optional[float] = None
+        # Phase 4.3: SessionManager additionally owns the asyncio task running
+        # AudioLoop.run() and the FaceAuthenticator reference (previously
+        # module-level globals in server.py).
+        self._loop_task: Any = None
+        self._authenticator: Any = None
 
     # ------------------------------------------------------------------
     # Lifecycle API
@@ -136,6 +141,34 @@ class SessionManager:
         """True if an AudioLoop is currently attached."""
         return self._audio_loop is not None
 
+    # ------------------------------------------------------------------
+    # Phase 4.3: loop task + authenticator ownership
+    # ------------------------------------------------------------------
+
+    @property
+    def loop_task(self) -> Any:
+        """Return the asyncio.Task running AudioLoop.run(), or None."""
+        return self._loop_task
+
+    def set_loop_task(self, task: Any) -> None:
+        """Store (or clear, with None) the asyncio.Task running AudioLoop.run().
+
+        SessionManager only owns the reference — cancellation remains an
+        explicit caller decision so existing shutdown ordering is unchanged.
+        """
+        with self._lock:
+            self._loop_task = task
+
+    @property
+    def authenticator(self) -> Any:
+        """Return the FaceAuthenticator instance, or None."""
+        return self._authenticator
+
+    def set_authenticator(self, authenticator: Any) -> None:
+        """Store (or clear, with None) the FaceAuthenticator reference."""
+        with self._lock:
+            self._authenticator = authenticator
+
     @property
     def attached_at(self) -> Optional[float]:
         """Unix timestamp when the current AudioLoop was attached."""
@@ -182,4 +215,6 @@ class SessionManager:
             "has_memory_store": self.memory_store is not None,
             "has_project_manager": self.project_manager is not None,
             "has_gemini_session": self.session is not None,
+            "has_loop_task": self._loop_task is not None,
+            "has_authenticator": self._authenticator is not None,
         }

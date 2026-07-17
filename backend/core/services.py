@@ -1,5 +1,5 @@
 """
-core/services.py — Lumina V2 Service Resolution Helpers (Phase 1.7 + Phase 3)
+core/services.py — Lumina V2 Service Resolution Helpers (Phase 1.7 + Phase 3 + Phase 4.5)
 
 A single, centralized set of strongly typed accessors for resolving
 services from the DependencyContainer. This module exists only to reduce
@@ -11,6 +11,9 @@ Phase 3 additions:
   - get_knowledge_manager()  — IKnowledgeManager resolution
   - get_session_manager()    — SessionManager resolution
   - get_service_accessor()   — ServiceAccessor resolution
+
+Phase 4.5 additions:
+  - get_application_host()   — ApplicationHost resolution
 
 This module does NOT:
   - cache anything (every call resolves fresh from the container; caching
@@ -114,3 +117,10 @@ def get_service_accessor(c: DependencyContainer = _default_container):
     from core.service_accessor import ServiceAccessor
     return c.resolve(ServiceAccessor)
 
+
+# ---- Phase 4.5 Lifecycle resolver ---------------------------------------
+
+def get_application_host(c: DependencyContainer = _default_container):
+    """Resolve the registered ApplicationHost."""
+    from core.application import ApplicationHost
+    return c.resolve(ApplicationHost)

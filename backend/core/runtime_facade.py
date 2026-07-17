@@ -1,5 +1,5 @@
 """
-core/runtime_facade.py — Lumina V2 Runtime Facade (Phase 1.8 + Phase 3)
+core/runtime_facade.py — Lumina V2 Runtime Facade (Phase 1.8 + Phase 3 + Phase 4.5)
 
 A single, centralized, strongly typed access point for the infrastructure
 services built in Phases 1.2–1.7 and extended in Phase 3.  Where Phase 1.7's
@@ -12,11 +12,14 @@ Phase 3 additions:
   - session_manager: SessionManager accessor
   - service_accessor: ServiceAccessor accessor
 
+Phase 4.5 additions:
+  - application_host: ApplicationHost accessor for unified lifecycle
+
 This facade:
   - performs no caching (delegates every call to core/services.py, which
     delegates to the container)
   - contains no business logic, no AI/planner/memory/routing logic
-  - manages no lifecycle
+  - manages no lifecycle (delegates to ApplicationHost)
 """
 
 from __future__ import annotations
@@ -45,6 +48,8 @@ class RuntimeFacade:
     Holds only a container reference; every accessor resolves fresh. The
     container defaults to the process-level singleton but can be injected
     for isolation in tests.
+
+    Phase 4.5: exposes ApplicationHost for unified lifecycle coordination.
     """
 
     def __init__(self, container: DependencyContainer = _default_container) -> None:
@@ -93,6 +98,13 @@ class RuntimeFacade:
         """Resolve the registered ServiceAccessor."""
         return services.get_service_accessor(self._container)
 
+    # ---- Phase 4.5: Application Lifecycle -------------------------------
+
+    @property
+    def application_host(self) -> Any:
+        """Resolve the registered ApplicationHost for unified lifecycle."""
+        return services.get_application_host(self._container)
+
     # ---- Adapters ------------------------------------------------------
 
     @property
@@ -115,4 +127,3 @@ class RuntimeFacade:
         construction explicit at the call site.
         """
         return services.get_execution_context_adapter(self._container)
-

@@ -362,7 +362,7 @@ from memory_store import MemoryStore
 from persona_engine import get_persona_engine
 
 class AudioLoop:
-    def __init__(self, video_mode=DEFAULT_MODE, on_audio_data=None, on_video_frame=None, on_cad_data=None, on_web_data=None, on_transcription=None, on_tool_confirmation=None, on_cad_status=None, on_cad_thought=None, on_project_update=None, on_device_update=None, on_error=None, on_model_status=None, input_device_index=None, input_device_name=None, output_device_index=None, kasa_agent=None):
+    def __init__(self, video_mode=DEFAULT_MODE, on_audio_data=None, on_video_frame=None, on_cad_data=None, on_web_data=None, on_transcription=None, on_tool_confirmation=None, on_cad_status=None, on_cad_thought=None, on_project_update=None, on_device_update=None, on_error=None, on_model_status=None, input_device_index=None, input_device_name=None, output_device_index=None, kasa_agent=None, memory_store=None, project_manager=None):
         self.video_mode = video_mode
         self.on_audio_data = on_audio_data
         self.on_video_frame = on_video_frame
@@ -465,20 +465,39 @@ class AudioLoop:
         self._is_speaking = False
         self._silence_start_time = None
         
-        # Initialize ProjectManager
-        from project_manager import ProjectManager
-        # Assuming we are running from backend/ or root? 
-        # Using abspath of current file to find root
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        # If lumina.py is in backend/, project root is one up
-        project_root = os.path.dirname(current_dir)
-        self.project_manager = ProjectManager(project_root)
+        # Resolve or construct ProjectManager
+        if project_manager is not None:
+            self.project_manager = project_manager
+            print("[LUMINA] ProjectManager injected via constructor")
+        else:
+            from core.interfaces import IWorkspaceManager
+            try:
+                self.project_manager = container.resolve(IWorkspaceManager)
+                print("[LUMINA] ProjectManager resolved from DI container")
+            except Exception:
+                from project_manager import ProjectManager
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                project_root = os.path.dirname(current_dir)
+                self.project_manager = ProjectManager(project_root)
+                print("[LUMINA] ProjectManager constructed inline (fallback)")
         self._dashboard = None
         self._phone_active = False
         
-        # Initialize Passive Memory Store
-        memory_db_path = os.path.join(current_dir, "lumina_memory.db")
-        self.memory_store = MemoryStore(memory_db_path)
+        # Resolve or construct Passive Memory Store
+        if memory_store is not None:
+            self.memory_store = memory_store
+            print("[LUMINA] Passive Memory Store injected via constructor")
+        else:
+            from core.interfaces import IMemoryManager
+            try:
+                self.memory_store = container.resolve(IMemoryManager)
+                print("[LUMINA] Passive Memory Store resolved from DI container")
+            except Exception:
+                from memory_store import MemoryStore
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                memory_db_path = os.path.join(current_dir, "lumina_memory.db")
+                self.memory_store = MemoryStore(memory_db_path)
+                print("[LUMINA] Passive Memory Store constructed inline (fallback)")
         print(f"[LUMINA] Passive Memory Store initialized")
         
         # Seed core identity fact (idempotent - only if not already present)

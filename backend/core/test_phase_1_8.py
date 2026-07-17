@@ -92,7 +92,7 @@ def run() -> None:
     c = _bootstrapped_container()
     registry = c.resolve(ServiceMetadataRegistry)
     check(isinstance(registry, ServiceMetadataRegistry), "ServiceMetadataRegistry resolves from container")
-    check(len(registry) == 10, "metadata registry describes all 10 infrastructure services")
+    check(len(registry) == 11, "metadata registry describes all 11 infrastructure services (10 pre-4.4 + MemoryEngine from Phase 4.4)")
     brain_md = registry.get(repr(IBrainState))
     check(brain_md is not None and brain_md.name == "BrainState", "BrainState metadata present and named")
     check(brain_md.owner == "Phase 1.2", "BrainState metadata records owning phase")
@@ -102,6 +102,10 @@ def run() -> None:
     proj_md = registry.get(repr(IWorkspaceManager))
     check(proj_md is not None and proj_md.name == "ProjectManager", "ProjectManager metadata present and named")
     check(proj_md is not None and proj_md.owner == "Phase 4.2", "ProjectManager metadata records owning phase (4.2)")
+    from core.interfaces import IKnowledgeManager
+    km_md = registry.get(repr(IKnowledgeManager))
+    check(km_md is not None and km_md.name == "MemoryEngine", "MemoryEngine metadata present and named")
+    check(km_md is not None and km_md.owner == "Phase 4.4", "MemoryEngine metadata records owning phase (4.4)")
     ctx_md = registry.get(repr(ExecutionContextAdapter))
     check(
         ctx_md is not None and ctx_md.lifecycle == LIFECYCLE_TRANSIENT,

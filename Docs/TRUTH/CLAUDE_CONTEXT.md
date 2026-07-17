@@ -47,8 +47,9 @@ The core engine should remain stable while capabilities grow through reusable sk
 
 Current Phase:
 
-Phase 4
-Stable Runtime Recovery
+Phase 4 — Stable Runtime Recovery: ✅ COMPLETE (2026-07-17)
+
+Next phase: Phase 5 (awaiting kickoff approval)
 
 Completed:
 
@@ -58,13 +59,11 @@ Completed:
 
 ✅ Phase 3 — Interface Refactor & Clean Architecture
 
-Current Work:
-
-Phase 4 — Stable Runtime Recovery
+✅ Phase 4 — Stable Runtime Recovery (Milestones 4.1–4.5; see Docs/Phase_4_Completion_Report.md)
 
 Future:
 
-Phase 5 — Memory Engine
+Phase 5 — Memory Engine / Cognitive Architecture
 
 Phase 6 — Planning Engine
 
@@ -174,23 +173,21 @@ Follow these principles unless the specification explicitly changes them.
 
 # Current Architectural Goals
 
-Phase 4 focuses on making the new architecture load-bearing.
+Phase 4 is complete — the new architecture is load-bearing:
 
-Priority work includes:
+- ✅ Single MemoryStore instance (DI-registered in Bootstrapper)
 
-- Single MemoryStore instance
+- ✅ Legacy runtime paths removed (`_get_memory_store()`, `memory_engine` global, `container.override` in start_audio)
 
-- Remove remaining legacy runtime paths
+- ✅ AudioLoop dependency injection complete
 
-- Complete AudioLoop dependency injection
+- ✅ Server globals eliminated (SessionManager ownership)
 
-- Eliminate remaining server globals
+- ✅ Unified startup/shutdown lifecycle (ApplicationHost cleanup hooks)
 
-- Improve startup/shutdown lifecycle
+- ⏸ Test consolidation deferred (pytest not provisioned in lumina env)
 
-- Consolidate tests
-
-Do NOT begin Phase 5 or Phase 6 work during Phase 4.
+Do NOT begin Phase 5 or Phase 6 implementation without explicit approval.
 
 ---
 

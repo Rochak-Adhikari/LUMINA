@@ -12,10 +12,13 @@ the order they are registered in are unchanged from the prior inline code.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.application import ApplicationHost
 
 from core.container import DependencyContainer
-from core.interfaces import IBrainState, IEventBus, IPipeline, ISmartHomeAgent
+from core.interfaces import IBrainState, IEventBus, IPipeline, ISmartHomeAgent, IMemoryManager, IWorkspaceManager, IKnowledgeManager
 from brain.state import BrainState
 from brain.events import InProcessEventBus
 from core.context import ExecutionContextFactory
@@ -26,6 +29,7 @@ from core.metadata import (
     ServiceMetadataRegistry,
     LIFECYCLE_INSTANCE,
     LIFECYCLE_TRANSIENT,
+    LIFECYCLE_SINGLETON,
 )
 
 
@@ -39,11 +43,15 @@ class Bootstrapper:
     whether it should exist.
     """
 
-    def __init__(self, container: DependencyContainer, kasa_agent: Optional[Any] = None) -> None:
+    def __init__(self, container: DependencyContainer, kasa_agent: Optional[Any] = None, app_host: Optional[ApplicationHost] = None) -> None:
         self._container = container
         self._kasa_agent = kasa_agent
+        self._app_host = app_host  # Phase 4.5: ApplicationHost reference for registration
         self.brain_state: Optional[BrainState] = None
         self.event_bus: Optional[InProcessEventBus] = None
+        self.memory_store: Optional[Any] = None
+        self.project_manager: Optional[Any] = None
+        self.memory_engine: Optional[Any] = None
         self.context_factory: Optional[ExecutionContextFactory] = None
         self.pipeline: Optional[RequestPipeline] = None
         self.brain_state_adapter: Optional[BrainStateAdapter] = None
@@ -56,10 +64,19 @@ class Bootstrapper:
         self._register_smart_home_agent()
         self._register_brain_state()
         self._register_event_bus()
+        self._register_memory_store()
+        self._register_project_manager()
+        self._register_memory_engine()
         self._register_execution_context_factory()
         self._register_pipeline()
         self._register_adapters()
         self._register_service_metadata()
+
+        # Phase 4.5: Register ApplicationHost as a singleton so it's accessible
+        # through RuntimeFacade for unified lifecycle coordination
+        if self._app_host is not None:
+            self._container.register_instance(type(self._app_host), self._app_host)
+            print("[DI] ApplicationHost registered")
 
     def _register_smart_home_agent(self) -> None:
         if self._kasa_agent is not None:
@@ -77,6 +94,46 @@ class Bootstrapper:
         self.event_bus = InProcessEventBus()
         self._container.register_instance(IEventBus, self.event_bus)
         print("[DI] IEventBus -> InProcessEventBus registered")
+
+    def _register_memory_store(self) -> None:
+        import os
+        from memory_store import MemoryStore
+        
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        memory_db_path = os.path.join(backend_dir, "lumina_memory.db")
+        
+        self.memory_store = MemoryStore(memory_db_path)
+        self._container.register_instance(IMemoryManager, self.memory_store)
+        print("[DI] IMemoryManager -> MemoryStore registered")
+
+    def _register_project_manager(self) -> None:
+        import os
+        from project_manager import ProjectManager
+
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        project_root = os.path.dirname(backend_dir)
+
+        self.project_manager = ProjectManager(project_root)
+        self._container.register_instance(IWorkspaceManager, self.project_manager)
+        print("[DI] IWorkspaceManager -> ProjectManager registered")
+
+    def _register_memory_engine(self) -> None:
+        """
+        Register MemoryEngine (IKnowledgeManager) as a LAZY singleton.
+
+        Construction is deferred to first resolve because MemoryEngine's
+        embedding provider probes the Gemini API at init — doing that at
+        module import would slow startup and fail offline. MemoryStore is
+        registered eagerly above, so all tables exist before the engine's
+        first use (preserving the Phase E5 init-order requirement).
+        """
+        def _build_memory_engine():
+            from memory_engine import MemoryEngine
+            self.memory_engine = MemoryEngine(db_path=str(self.memory_store.db_path))
+            return self.memory_engine
+
+        self._container.register_singleton(IKnowledgeManager, _build_memory_engine)
+        print("[DI] IKnowledgeManager -> MemoryEngine registered (lazy singleton)")
 
     def _register_execution_context_factory(self) -> None:
         self.context_factory = ExecutionContextFactory()
@@ -150,6 +207,21 @@ class Bootstrapper:
                 name="EventBus", key=repr(IEventBus),
                 lifecycle=LIFECYCLE_INSTANCE, owner="Phase 1.2",
                 description="In-process publish/subscribe event bus.",
+            ),
+            ServiceMetadata(
+                name="MemoryStore", key=repr(IMemoryManager),
+                lifecycle=LIFECYCLE_INSTANCE, owner="Phase 4.2",
+                description="Passive memory persistence layer.",
+            ),
+            ServiceMetadata(
+                name="ProjectManager", key=repr(IWorkspaceManager),
+                lifecycle=LIFECYCLE_INSTANCE, owner="Phase 4.2",
+                description="Project workspace manager.",
+            ),
+            ServiceMetadata(
+                name="MemoryEngine", key=repr(IKnowledgeManager),
+                lifecycle=LIFECYCLE_SINGLETON, owner="Phase 4.4",
+                description="Semantic memory engine (lazy — built on first resolve).",
             ),
             ServiceMetadata(
                 name="ExecutionContextFactory", key=repr(ExecutionContextFactory),
