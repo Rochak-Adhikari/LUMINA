@@ -3631,7 +3631,13 @@ if __name__ == "__main__":
     print(f"[STARTUP] Starting Lumina backend on 0.0.0.0:{_selected_port}")
 
     uvicorn.run(
-        "server:app_socketio",
+        # Pass the app OBJECT, not the "server:app_socketio" import string.
+        # The string form makes uvicorn re-import this file as module "server"
+        # (separate from "__main__"), re-running module-level bootstrap against
+        # the process-global DI container -> "IBrainState is already registered".
+        # Object form serves the already-built app with no second import.
+        # (Import string is only required for reload/workers; reload is False.)
+        app_socketio,
         host="0.0.0.0",
         port=_selected_port,
         reload=False, # Reload enabled causes spawn of worker which might miss the event loop policy patch

@@ -12,6 +12,7 @@ app.commandLine.appendSwitch('remote-debugging-port', '9223');
 
 let mainWindow;
 let pythonProcess;
+let backendPort = 8000; // Dynamically discovered backend port
 
 let browserViews = {}; // tabId -> BrowserView
 let activeTabId = null;
@@ -122,7 +123,8 @@ function startPythonBackend() {
     const pythonExe = fs.existsSync(condaPython) ? condaPython : 'python';
 
     const childEnv = Object.assign({}, process.env, {
-        CONDA_DEFAULT_ENV: 'E:\\AI\\conda_envs\\lumina'
+        CONDA_DEFAULT_ENV: 'E:\\AI\\conda_envs\\lumina',
+        PYTHONUNBUFFERED: '1'
     });
 
     pythonProcess = spawn(pythonExe, [scriptPath], {
@@ -131,7 +133,15 @@ function startPythonBackend() {
     });
 
     pythonProcess.stdout.on('data', (data) => {
-        console.log(`[Python]: ${data}`);
+        const str = data.toString();
+        console.log(`[Python]: ${str}`);
+        
+        // Parse port if startup logs it
+        const match = str.match(/\[STARTUP\] Starting Lumina backend on 0\.0\.0\.0:(\d+)/);
+        if (match) {
+            backendPort = parseInt(match[1], 10);
+            console.log(`[Electron] Discovered spawned backend port: ${backendPort}`);
+        }
     });
 
     pythonProcess.stderr.on('data', (data) => {
@@ -155,6 +165,17 @@ function startPythonBackend() {
 }
 
 app.whenReady().then(() => {
+    // Intercept and redirect all localhost:8000/127.0.0.1:8000 traffic to the discovered backendPort
+    session.defaultSession.webRequest.onBeforeRequest(
+        { urls: ['*://localhost:8000/*', '*://127.0.0.1:8000/*'] },
+        (details, callback) => {
+            const redirectUrl = details.url
+                .replace('localhost:8000', `localhost:${backendPort}`)
+                .replace('127.0.0.1:8000', `127.0.0.1:${backendPort}`);
+            callback({ redirectURL: redirectUrl });
+        }
+    );
+
     ipcMain.on('window-minimize', () => {
         if (mainWindow) mainWindow.minimize();
     });
@@ -404,15 +425,16 @@ app.whenReady().then(() => {
         }
     });
 
-    checkBackendPort(8000).then((isTaken) => {
-        if (isTaken) {
-            console.log('Port 8000 is taken. Assuming backend is already running manually.');
-            waitForBackend().then(createWindow);
+    discoverBackendPort().then((port) => {
+        if (port !== null) {
+            console.log(`Backend is already running manually on port ${port}.`);
+            backendPort = port;
+            createWindow();
         } else {
+            console.log('No manual backend found. Starting Python backend...');
             startPythonBackend();
-            setTimeout(() => {
-                waitForBackend().then(createWindow);
-            }, 1000);
+            // Wait for backend to be ready on the discovered port
+            waitForBackend().then(createWindow);
         }
     });
 
@@ -440,11 +462,54 @@ function checkBackendPort(port) {
     });
 }
 
+function discoverBackendPort() {
+    return new Promise((resolve) => {
+        const http = require('http');
+        let portToTry = 8000;
+        
+        const tryNext = () => {
+            if (portToTry > 8009) {
+                console.log('Could not find active manual backend on ports 8000-8009.');
+                resolve(null);
+                return;
+            }
+            
+            const req = http.get(`http://127.0.0.1:${portToTry}/status`, { timeout: 150 }, (res) => {
+                let body = '';
+                res.on('data', chunk => body += chunk);
+                res.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(body);
+                        if (parsed.status === 'running' && parsed.service === 'Lumina Backend') {
+                            resolve(portToTry);
+                            return;
+                        }
+                    } catch (e) {}
+                    portToTry++;
+                    tryNext();
+                });
+            });
+            req.on('error', () => {
+                portToTry++;
+                tryNext();
+            });
+            req.on('timeout', () => {
+                req.destroy();
+                portToTry++;
+                tryNext();
+            });
+        };
+        
+        tryNext();
+    });
+}
+
 function waitForBackend() {
     return new Promise((resolve) => {
         const check = () => {
             const http = require('http');
-            http.get('http://127.0.0.1:8000/status', (res) => {
+            console.log(`Waiting for backend on port ${backendPort}...`);
+            http.get(`http://127.0.0.1:${backendPort}/status`, (res) => {
                 if (res.statusCode === 200) {
                     console.log('Backend is ready!');
                     resolve();
