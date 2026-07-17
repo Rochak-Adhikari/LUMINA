@@ -37,20 +37,69 @@ The backend application follows a clean, decoupled dependency-injected design:
 
 ## Current Implementation Status
 
-| Stage / Phase | Focus | Status |
-| :--- | :--- | :--- |
-| **Phase 1** | Runtime Foundation (DI, State, Pipeline, Bootstrapper) | **Completed** |
-| **Phase 2** | Brain Architecture (Memory Store, Session Manager, Port Allocation) | **Completed** |
-| **Phase 3** | Interface Refactor & Clean Architecture (Decoupled accessors, Event routing) | **Completed** |
-| **Phase 4** | **Stable Runtime Recovery** (Technical debt elimination, startup/shutdown lifecycles) | **Current Phase**<br>*Not yet restarted. Implementation will begin from a clean repository.* |
-| **Phase 5** | Memory Engine (Semantic storage, vector databases, workspace context) | **Planned** |
-| **Phase 6** | Planning Engine (Task decomposition, reasoning chains, adaptive tool routing) | **Planned** |
+| Stage / Phase | Focus | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| **Phase 1** | Runtime Foundation | ✅ Completed | Dependency Injection container (`core/container.py`), Application bootstrapper (`core/bootstrap.py`), Lifecycle hosting (`core/application.py`), and Context mapping (`core/context.py`) are implemented and verified via unit tests. |
+| **Phase 2** | Brain Architecture | 🟡 Partially Complete | The sandbox state class (`brain/state.py`) and pub/sub event bus (`brain/events.py`) are implemented and tested, but their full integration within the active server routes remains incomplete due to legacy global state dependencies, inline constructor instantiation of resource managers, and hardcoded socket ports. |
+| **Phase 3** | Interface Refactor & Clean Architecture | 🟡 Partially Complete | The `SessionManager` (`core/session.py`) and `ServiceAccessor` (`core/service_accessor.py`) interfaces are implemented, but the active backend execution path (`server.py`, `lumina.py`) has not yet been fully refactored to route queries and loops exclusively through these abstractions, bypassing them in favor of legacy globals. |
+| **Phase 4** | **Stable Runtime Recovery** | 🟡 In Progress | **Current Phase**. Milestone 4.1 (graceful port recovery) is complete: startup keeps port 8000 when free and scans 8001–8009 only when 8000 is occupied. Remaining milestones (4.2–4.5) still pending. |
+| **Phase 5** | Memory Engine | ❌ Not Started | Planned future phase. Focuses on semantic memory storage, local vector search indexes, knowledge graph structures, and project/workspace context maps. |
+| **Phase 6** | Planning Engine | ❌ Not Started | Planned future phase. Focuses on structured task decomposition, reasoning chains, dynamic tool binding, and adaptive execution planners. |
 
-### Future Horizons
-*   **Skill Evolution**: Sandboxed skill generation, validation, and dynamic compilation workflows.
-*   **Reflection**: Automated failure reviews, success scoring, and runtime optimization recommendations.
-*   **Multi-Agent System**: Shared planning, execution, and review processes via common memory buffers.
-*   **Continuous Learning**: Ongoing workspace feedback processing and refinement.
+---
+
+## Current Technical Debt
+
+Every item below represents a verified dependency or architectural gap present in the current codebase:
+
+*   **Multiple MemoryStore Instances**: `server.py` implements its own cached `_fallback_memory_store` pointing directly to `"lumina_memory.db"`, while `AudioLoop` (`lumina.py`) constructs its own separate connection at startup, resulting in redundant SQLite connection handles and bypassing the DI registration.
+*   **AudioLoop Constructs Dependencies Inline**: `AudioLoop.__init__` instantiates `MemoryStore` and `ProjectManager` directly on disk rather than resolving them via the DI container or accepting them as constructor arguments.
+*   **Remaining server.py Globals**: Core states (`audio_loop`, `loop_task`, `authenticator`, `kasa_agent`) are declared as globals in `server.py` and modified directly by event handlers instead of being managed inside `SessionManager`.
+*   **Port Recovery** ✅ *Resolved (Milestone 4.1)*: The startup routine previously ran `uvicorn.run` hardcoded to port `8000` with no recovery. It now keeps 8000 when free and scans 8001–8009 only when 8000 is occupied, logging each decision.
+*   **Legacy Shutdown Path**: `server.py` uses legacy shutdown paths in `shutdown_event()` that directly reference `audio_loop` globals instead of cleanly routing the teardown through the DI-resolved `SessionManager`.
+*   **Tests Not Fully Consolidated**: Unit tests are scattered across core directories (`backend/core/`, `backend/brain/`) rather than being fully consolidated under `backend/tests/`.
+
+---
+
+## Phase 4 Implementation Plan
+
+The objective of Phase 4 is to eliminate the technical debt identified above, stabilize startup/shutdown lifecycles, complete dependency injection, and achieve clean architecture alignment.
+
+### Milestone 4.1: Graceful Startup, Port Recovery & Logging ✅ Complete
+*   **Objective**: Implement a self-healing port recovery system to handle socket starvation, and improve system startup logs.
+*   **Files changed**: `backend/server.py` (module-scope `is_port_free` / `select_startup_port` helpers + `__main__` entrypoint), `backend/tests/test_port_recovery.py` (new regression test).
+*   **Delivered**: Port 8000 is preserved when free; only when occupied does startup scan 8001–8009 for the first free port. Descriptive `[STARTUP]` console output on free/occupied/recovered/failure. Range exhaustion raises an explicit `OSError` instead of an opaque uvicorn bind crash. The probe intentionally omits `SO_REUSEADDR` so it matches uvicorn's real bind on Windows.
+*   **Verification**: 6/6 regression tests pass (stdlib `unittest`). Live probe confirmed: 8000 free → binds 8000; 8000 occupied → recovers to 8001.
+*   **Note**: Frontend (`Ui_TEST/AppTest.jsx`) and Electron (`electron/main.js`) still hardcode `localhost:8000`; keeping 8000 canonical when free preserves that contract. Wiring clients to a recovered port is out of scope for 4.1.
+*   **Dependencies**: Phase 1 container setup.
+
+### Milestone 4.2: Dependency Injection for AudioLoop
+*   **Objective**: Refactor `AudioLoop` initialization to receive its `MemoryStore` and `ProjectManager` dependencies dynamically via dependency injection, resolving inline constructor instantiation.
+*   **Files expected to change**: `backend/lumina.py`, `backend/core/bootstrap.py`
+*   **Expected deliverables**: Refactored `AudioLoop` constructor accepting dependency interfaces, updated container registry to manage their lifecycles.
+*   **Verification criteria**: Successful DI container boot and instantiation of `AudioLoop` using injected dependencies.
+*   **Dependencies**: Phase 1 DI container.
+
+### Milestone 4.3: Decouple Global State & Wire SessionManager
+*   **Objective**: Eradicate the scattered global variables (`audio_loop`, `loop_task`, `authenticator`, `kasa_agent`) inside `server.py` by fully routing loop lifecycle and state queries through `SessionManager`.
+*   **Files expected to change**: `backend/server.py`, `backend/core/session.py`
+*   **Expected deliverables**: No global handles representing active loops/connections inside handlers.
+*   **Verification criteria**: Event handlers query active sessions and authenticators through `SessionManager`.
+*   **Dependencies**: Milestone 4.2.
+
+### Milestone 4.4: Authoritative ServiceAccessor Integration
+*   **Objective**: Clean up legacy lookup functions (like `_get_memory_store()`) and route all CRUD endpoint queries exclusively through the DI-resolved `ServiceAccessor` (`_svc.memory_store`).
+*   **Files expected to change**: `backend/server.py`, `backend/core/service_accessor.py`
+*   **Expected deliverables**: Total elimination of legacy fallback lookup paths in server routes.
+*   **Verification criteria**: CRUD tests confirm all queries resolve via DIAccessor context.
+*   **Dependencies**: Milestone 4.3.
+
+### Milestone 4.5: Clean Shutdown Teardown & Test Consolidation
+*   **Objective**: Unify the server shutdown teardown sequence inside the application host lifecycle, and move remaining unit tests from `core/` and `brain/` directories into `backend/tests/`.
+*   **Files expected to change**: `backend/server.py`, `backend/core/application.py`, test file locations.
+*   **Expected deliverables**: Graceful teardown loop sequence on signal intercept/FastAPI shutdown, fully consolidated tests folder structure.
+*   **Verification criteria**: Pytest runs clean from `backend/tests/`, and SIGINT triggers graceful, non-hanging shutdown.
+*   **Dependencies**: Milestone 4.4.
 
 ---
 
@@ -60,3 +109,12 @@ When **Phase 4 (Stable Runtime Recovery)** is initiated from this clean slate, t
 2.  Eliminate remaining technical debt and ensure memory manager lookups route solely through the DI container accessor (`_svc.memory_store`).
 3.  Verify the robustness of the request execution pipeline under concurrency stress tests.
 4.  Integrate the reorganized test directory structure with localized testing environments.
+
+---
+
+## Documentation Changelog
+*   **Updated CURRENT_STATUS.md**:
+    *   Marked Phase 2 and Phase 3 as `🟡 Partially Complete` to reflect real repository state.
+    *   Marked Phase 4 as `❌ Not Started` and labeled it as the Current Phase.
+    *   Added a verified `Current Technical Debt` section highlighting global state issues, multiple `MemoryStore` handles, and port recovery bugs.
+    *   Added a detailed `Phase 4 Implementation Plan` covering Milestones 4.1 to 4.5.

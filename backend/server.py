@@ -3564,6 +3564,56 @@ async def memory_deny_endpoint(request: Request):
         return {"status": "demoted", "id": mem_id, "new_state": "dormant"}
     return JSONResponse({"error": f"Memory {mem_id} not found or already dormant"}, status_code=404)
 
+
+# ========================================
+# PHASE 4.1: GRACEFUL PORT RECOVERY
+# ========================================
+# Default port stays 8000 to preserve the existing frontend/Electron contract
+# (both hardcode localhost:8000). Only if 8000 is already occupied do we scan
+# forward through 8001–8009 for a free port, so a stale/duplicate process no
+# longer crashes startup with an unhandled OSError.
+import socket as _socket
+
+PORT_PRIMARY = 8000
+PORT_SCAN_END = 8009  # inclusive upper bound of fallback scan range
+
+
+def is_port_free(host: str, port: int) -> bool:
+    """Return True if (host, port) can be bound right now.
+
+    Deliberately does NOT set SO_REUSEADDR: on Windows SO_REUSEADDR permits
+    binding a port another socket already holds, which would make this probe
+    report an occupied port as free. uvicorn's default bind does not use it,
+    so this plain bind matches the real startup behavior we are predicting.
+    """
+    with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def select_startup_port(host: str) -> int:
+    """Pick 8000 if free, else the first free port in 8001–8009.
+
+    Raises OSError if the entire range is occupied so the failure is explicit
+    rather than a silent bind error deep inside uvicorn.
+    """
+    if is_port_free(host, PORT_PRIMARY):
+        print(f"[STARTUP] Port {PORT_PRIMARY} is free — binding default port.")
+        return PORT_PRIMARY
+    print(f"[STARTUP] Port {PORT_PRIMARY} is occupied — scanning {PORT_PRIMARY + 1}–{PORT_SCAN_END} for a free port...")
+    for candidate in range(PORT_PRIMARY + 1, PORT_SCAN_END + 1):
+        if is_port_free(host, candidate):
+            print(f"[STARTUP] Recovered — binding to fallback port {candidate}.")
+            return candidate
+    raise OSError(
+        f"No free port available in range {PORT_PRIMARY}–{PORT_SCAN_END}. "
+        f"Close the process holding these ports and retry."
+    )
+
+
 if __name__ == "__main__":
     print("\n" + "="*70)
     print("[MEMORY LIFECYCLE] Endpoints:")
@@ -3574,11 +3624,16 @@ if __name__ == "__main__":
     print("  POST /memory/deny     — demote pending->dormant {id}")
     print("  POST /memory/reindex  — reindex all")
     print("="*70 + "\n")
-    
+
+    # uvicorn binds to 0.0.0.0; probe the loopback address for availability
+    # (a free loopback bind reliably predicts the 0.0.0.0 bind on Windows).
+    _selected_port = select_startup_port("127.0.0.1")
+    print(f"[STARTUP] Starting Lumina backend on 0.0.0.0:{_selected_port}")
+
     uvicorn.run(
-        "server:app_socketio", 
-        host="0.0.0.0", 
-        port=8000, 
+        "server:app_socketio",
+        host="0.0.0.0",
+        port=_selected_port,
         reload=False, # Reload enabled causes spawn of worker which might miss the event loop policy patch
         loop="asyncio",
         reload_excludes=["temp_cad_gen.py", "output.stl", "*.stl"]

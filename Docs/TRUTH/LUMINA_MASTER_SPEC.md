@@ -316,13 +316,13 @@
 
 [Result [69](#result)](#result)
 
-[Phase 2 --- Brain Architecture ✅ Completed [69](#phase-2-brain-architecture-completed)](#phase-2-brain-architecture-completed)
+[Phase 2 --- Brain Architecture 🟡 Partially Complete [69](#phase-2-brain-architecture-completed)](#phase-2-brain-architecture-completed)
 
 [Completed Components [69](#completed-components-1)](#completed-components-1)
 
 [Result [69](#result-1)](#result-1)
 
-[Phase 3 --- Interface Refactor & Clean Architecture ✅ Completed [69](#phase-3-interface-refactor-clean-architecture-completed)](#phase-3-interface-refactor-clean-architecture-completed)
+[Phase 3 --- Interface Refactor & Clean Architecture 🟡 Partially Complete [69](#phase-3-interface-refactor-clean-architecture-completed)](#phase-3-interface-refactor-clean-architecture-completed)
 
 [Completed Components [70](#completed-components-2)](#completed-components-2)
 
@@ -3150,7 +3150,7 @@ Create a stable backend architecture that future systems can depend upon.
 
 A modular backend where services are no longer tightly coupled.
 
-# **Phase 2 --- Brain Architecture ✅ Completed** {#phase-2-brain-architecture-completed}
+# **Phase 2 --- Brain Architecture 🟡 Partially Complete** {#phase-2-brain-architecture-completed}
 
 **Objective**
 
@@ -3178,7 +3178,7 @@ Separate reasoning from execution.
 
 Lumina now has a dedicated reasoning layer independent from tools.
 
-# **Phase 3 --- Interface Refactor & Clean Architecture ✅ Completed** {#phase-3-interface-refactor-clean-architecture-completed}
+# **Phase 3 --- Interface Refactor & Clean Architecture 🟡 Partially Complete** {#phase-3-interface-refactor-clean-architecture-completed}
 
 **Objective**
 
@@ -4704,3 +4704,8 @@ This document serves as the authoritative reference for future development. Any 
 # **End of Software Design Specification (SDS) Version 1.0** {#end-of-software-design-specification-sds-version-1.0}
 
 This document represents the initial architectural foundation of Lumina AI and serves as the primary reference for its future design, implementation, and evolution.
+
+---
+
+## Documentation Changelog
+* **Updated Phase 2 and Phase 3 Headers**: Changed status indicators from `✅ Completed` to `🟡 Partially Complete` in both the Table of Contents and corresponding section headers to reflect active repository technical debts.
