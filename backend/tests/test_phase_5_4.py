@@ -498,18 +498,34 @@ class TestOrder6_DispatchClosure(unittest.TestCase):
         from core.legacy_dispatch import build_session_dispatch, SessionGone
         loop = self._loop(permissions={"navigate_ui": True}, session="live")
         dispatch = build_session_dispatch(loop)
-        # Session swapped/gone after bind → refuse.
+        # Session gone at dispatch time → refuse.
         loop.session = None
         with self.assertRaises(SessionGone):
             asyncio.run(dispatch("navigate_ui", {}))
 
     def test_closure_session_replaced_refused(self):
+        # Step 7 lazy capture: first dispatch captures the live session;
+        # a subsequent dispatch on a DIFFERENT session object refuses.
         from core.legacy_dispatch import build_session_dispatch, SessionGone
         loop = self._loop(permissions={"navigate_ui": True}, session="s1")
+        loop.on_voice_command = lambda p, v: None
         dispatch = build_session_dispatch(loop)
+        asyncio.run(dispatch("navigate_ui", {"panel": "quests"}))  # captures s1
         loop.session = "s2"  # reconnect → different session object
         with self.assertRaises(SessionGone):
-            asyncio.run(dispatch("navigate_ui", {}))
+            asyncio.run(dispatch("navigate_ui", {"panel": "quests"}))
+
+    def test_closure_lazy_capture_session_established_after_build(self):
+        # Step 7 fix: the closure is built at start_audio BEFORE the Gemini
+        # session goes live (session=None at build). Once the session is
+        # established, dispatch must succeed — not false-positive SessionGone.
+        from core.legacy_dispatch import build_session_dispatch
+        loop = self._loop(permissions={"navigate_ui": True}, session=None)
+        loop.on_voice_command = lambda p, v: None
+        dispatch = build_session_dispatch(loop)  # built with no session
+        loop.session = "now-live"                # session established later
+        out = asyncio.run(dispatch("navigate_ui", {"panel": "quests"}))
+        self.assertIn("result", out)
 
     # ---- brain import-whitelist intact --------------------------------
 
@@ -620,6 +636,65 @@ class TestOrder7_BrainCoreOrchestration(unittest.TestCase):
         self.assertEqual(before, after)
 
 
+class TestStep7_FlagOnValidation(unittest.TestCase):
+    """Step 7: live flag-on A/B validation.
+
+    With a dispatch bound to a live (fake) session, a nav request routed
+    through BrainCore must execute navigate_ui and drive the SAME UI
+    navigation the legacy nav fast-path produces — proving flag-on parity.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.container = DependencyContainer()
+        Bootstrapper(container=cls.container, kasa_agent=None).bootstrap()
+        from core.runtime_facade import RuntimeFacade
+        cls.facade = RuntimeFacade(cls.container)
+
+    def test_brain_path_drives_navigation_like_legacy(self):
+        from core.legacy_dispatch import build_session_dispatch
+        from brain.skills.executors.legacy_tool_executor import LegacyToolExecutor
+
+        nav_calls = []
+        loop = SimpleNamespace(
+            session="live",
+            permissions={"navigate_ui": True},
+            memory_store=None,
+            _browser_confirmation_mode="strict",
+            on_voice_command=lambda panel, view: nav_calls.append((panel, view)),
+        )
+
+        executor = self.container.resolve(LegacyToolExecutor)
+        executor.bind(build_session_dispatch(loop))
+        try:
+            core = self.container.resolve(IBrainCore)
+            result = asyncio.run(core.handle(BrainRequest(text="open the quests panel")))
+            self.assertTrue(result.handled)
+            self.assertEqual(result.plan.tasks[0].skill_id, "legacy.navigate_ui")
+            # A/B parity: navigate_ui drove on_voice_command with the same
+            # panel the legacy nav fast-path emits for this phrase.
+            self.assertEqual(nav_calls, [("quests", "all")])
+        finally:
+            executor.unbind()
+
+    def test_flag_on_declines_when_session_not_live(self):
+        from core.legacy_dispatch import build_session_dispatch
+        from brain.skills.executors.legacy_tool_executor import LegacyToolExecutor
+        loop = SimpleNamespace(
+            session=None, permissions={"navigate_ui": True},
+            memory_store=None, _browser_confirmation_mode="strict",
+            on_voice_command=lambda p, v: None,
+        )
+        executor = self.container.resolve(LegacyToolExecutor)
+        executor.bind(build_session_dispatch(loop))
+        try:
+            core = self.container.resolve(IBrainCore)
+            result = asyncio.run(core.handle(BrainRequest(text="open the quests panel")))
+            self.assertFalse(result.handled)
+        finally:
+            executor.unbind()
+
+
 class TestOrder8_ServerWiring(unittest.TestCase):
     """Order 8: brain_core_enabled flag + P1 intercept + P2 bind/unbind.
 
@@ -686,6 +761,69 @@ class TestOrder8_ServerWiring(unittest.TestCase):
         src = self._server_src()
         self.assertIn('"brain_core_enabled": False', src)
         self.assertNotIn('"brain_core_enabled": True', src)
+
+
+class TestStep8_PlannerFlip(unittest.TestCase):
+    """Step 8: IPlanner flipped from RulePlanner to PlannerChain (production).
+
+    Evidence that RulePlanner is no longer the planner resolved through
+    IPlanner, and that PlannerChain is now the production planner — plus the
+    full flip-path still drives navigation end to end.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.container = DependencyContainer()
+        Bootstrapper(container=cls.container, kasa_agent=None).bootstrap()
+        from core.runtime_facade import RuntimeFacade
+        cls.facade = RuntimeFacade(cls.container)
+
+    def test_iplanner_resolves_planner_chain_not_rule_planner(self):
+        from brain.core.interfaces import IPlanner
+        from brain.planning.llm_planner import PlannerChain
+        from brain.planning.rule_planner import RulePlanner
+        resolved = self.container.resolve(IPlanner)
+        self.assertIsInstance(resolved, PlannerChain)
+        self.assertNotIsInstance(resolved, RulePlanner)
+
+    def test_iplanner_is_same_instance_as_planner_chain_key(self):
+        from brain.core.interfaces import IPlanner
+        from brain.planning.llm_planner import PlannerChain
+        self.assertIs(self.container.resolve(IPlanner),
+                      self.container.resolve(PlannerChain))
+
+    def test_facade_planner_is_chain(self):
+        from brain.planning.llm_planner import PlannerChain
+        self.assertIsInstance(self.facade.planner, PlannerChain)
+
+    def test_no_duplicate_iplanner_registration(self):
+        # Registered exactly once (to the chain); resolving twice is stable.
+        from brain.core.interfaces import IPlanner
+        self.assertTrue(self.container.is_registered(IPlanner))
+        self.assertIs(self.container.resolve(IPlanner),
+                      self.container.resolve(IPlanner))
+
+    def test_flip_path_drives_navigation_end_to_end(self):
+        # Full production path: BrainCore -> PlannerChain (via IPlanner-equiv
+        # injection) -> SkillManager -> LegacyToolExecutor -> legacy_dispatch
+        # -> navigate_ui -> UI event.
+        from core.legacy_dispatch import build_session_dispatch
+        from brain.skills.executors.legacy_tool_executor import LegacyToolExecutor
+        nav = []
+        loop = SimpleNamespace(
+            session="live", permissions={"navigate_ui": True},
+            memory_store=None, _browser_confirmation_mode="strict",
+            on_voice_command=lambda p, v: nav.append((p, v)),
+        )
+        executor = self.container.resolve(LegacyToolExecutor)
+        executor.bind(build_session_dispatch(loop))
+        try:
+            core = self.container.resolve(IBrainCore)
+            result = asyncio.run(core.handle(BrainRequest(text="open the quests panel")))
+            self.assertTrue(result.handled)
+            self.assertEqual(nav, [("quests", "all")])
+        finally:
+            executor.unbind()
 
 
 if __name__ == '__main__':

@@ -63,8 +63,11 @@ class TestPhase5_2_DI(unittest.TestCase):
         cls.facade = RuntimeFacade(cls.container)
 
     def test_planner_resolves(self):
+        # Phase 5.4 Step 8: IPlanner now binds the production PlannerChain
+        # (retired the temporary IPlanner -> RulePlanner compat binding).
+        from brain.planning.llm_planner import PlannerChain
         p1 = self.container.resolve(IPlanner)
-        self.assertIsInstance(p1, RulePlanner)
+        self.assertIsInstance(p1, PlannerChain)
         self.assertIs(p1, self.container.resolve(IPlanner))
 
     def test_registry_resolves(self):

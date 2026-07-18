@@ -256,8 +256,7 @@ class Bootstrapper:
         from brain.skills.builtin import seed_registry
 
         self.planner = RulePlanner()
-        self._container.register_instance(IPlanner, self.planner)
-        print("[DI] IPlanner -> RulePlanner registered")
+        print("[DI] RulePlanner constructed (chain member)")
 
         self.skill_registry = SkillRegistry()
         seeded = seed_registry(self.skill_registry)
@@ -280,9 +279,9 @@ class Bootstrapper:
 
         # Phase 5.3: LLMPlanner + fallback chain. No IModelGateway
         # implementation exists in the repository, so the LLM planner is
-        # registered UNBOUND (inert — plan() returns None). IPlanner keeps
-        # resolving RulePlanner; the chain has its own key until runtime
-        # wiring flips the binding in a later milestone.
+        # registered UNBOUND (inert — plan() returns None). Phase 5.4 Step 8
+        # binds IPlanner to the chain (below), retiring the earlier temporary
+        # IPlanner -> RulePlanner compat binding.
         from brain.planning.llm_planner import LLMPlanner, PlannerChain
 
         self.llm_planner = LLMPlanner(
@@ -294,6 +293,14 @@ class Bootstrapper:
 
         self.planner_chain = PlannerChain([self.planner, self.llm_planner])
         self._container.register_instance(PlannerChain, self.planner_chain)
+
+        # Phase 5.4 Step 8: flip the IPlanner binding to the production planner.
+        # The temporary IPlanner -> RulePlanner compat binding is retired now
+        # that PlannerChain is validated end-to-end (Step 7). BrainCore already
+        # receives the chain via direct injection; this aligns the interface
+        # key with the production planner for any IPlanner consumer.
+        self._container.register_instance(IPlanner, self.planner_chain)
+        print("[DI] IPlanner -> PlannerChain registered (RulePlanner -> LLMPlanner)")
         print("[DI] PlannerChain registered (RulePlanner -> LLMPlanner)")
 
     def _register_service_metadata(self) -> None:

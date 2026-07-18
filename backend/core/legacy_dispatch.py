@@ -78,16 +78,30 @@ def build_session_dispatch(audio_loop: Any) -> Callable[[str, Dict[str, Any]], A
     # unless a session actually binds a dispatch.
     from actions import ACTION_REGISTRY
 
-    bound_session = getattr(audio_loop, "session", None)
+    # Phase 5.4 Step 7: LAZY session capture. The Gemini session is established
+    # inside audio_loop.run(), which is spawned AFTER this closure is built at
+    # start_audio — so snapshotting the session here would capture None and the
+    # liveness guard would false-positive on the first live dispatch. Instead,
+    # capture the session identity on the first dispatch (the P1 intercept only
+    # calls when session is already live) and thereafter refuse if it is gone
+    # (teardown) or replaced (mid-session reconnect) — preserving the D7 intent.
+    captured = {"session": None, "set": False}
 
     async def dispatch(provider_ref: str, params: Dict[str, Any]) -> Any:
         name = provider_ref
 
-        # ---- Liveness guard (D7) --------------------------------------
+        # ---- Liveness guard (D7, lazy capture) ------------------------
         current = getattr(audio_loop, "session", None)
-        if current is None or current is not bound_session:
+        if current is None:
             raise SessionGone(
-                f"Session for tool '{name}' is no longer live; refusing dispatch."
+                f"No live session for tool '{name}'; refusing dispatch."
+            )
+        if not captured["set"]:
+            captured["session"] = current
+            captured["set"] = True
+        elif current is not captured["session"]:
+            raise SessionGone(
+                f"Session for tool '{name}' was replaced; refusing dispatch."
             )
 
         # ---- Permission gate (parity with lumina.py) ------------------

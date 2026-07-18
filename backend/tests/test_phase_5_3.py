@@ -88,9 +88,12 @@ class TestPhase5_3_DI(unittest.TestCase):
         self.assertIsInstance(c, PlannerChain)
         self.assertIs(c, self.container.resolve(PlannerChain))
 
-    def test_iplanner_binding_unchanged(self):
-        """No runtime wiring: IPlanner must still resolve RulePlanner."""
-        self.assertIsInstance(self.container.resolve(IPlanner), RulePlanner)
+    def test_iplanner_binds_planner_chain(self):
+        """Phase 5.4 Step 8: IPlanner now resolves the production PlannerChain
+        (the temporary IPlanner -> RulePlanner compat binding is retired)."""
+        self.assertIsInstance(self.container.resolve(IPlanner), PlannerChain)
+        self.assertIs(self.container.resolve(IPlanner),
+                      self.container.resolve(PlannerChain))
 
     def test_runtime_facade_exposes_both(self):
         self.assertIs(self.facade.llm_planner, self.container.resolve(LLMPlanner))

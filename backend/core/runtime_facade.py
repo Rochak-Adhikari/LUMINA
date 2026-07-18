@@ -127,7 +127,7 @@ class RuntimeFacade:
 
     @property
     def planner(self) -> Any:
-        """Resolve the registered IPlanner (Phase 5.2: RulePlanner)."""
+        """Resolve the registered IPlanner (Phase 5.4 Step 8: PlannerChain)."""
         from brain.core.interfaces import IPlanner
         return self._container.resolve(IPlanner)
 
