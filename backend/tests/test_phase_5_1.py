@@ -158,14 +158,17 @@ class TestPhase5_1_Models(unittest.TestCase):
 class TestPhase5_1_No_Runtime_Wiring(unittest.TestCase):
     """Guard: Phase 5.1 must not change runtime behavior."""
 
-    def test_server_does_not_reference_brain_core(self):
-        """server.py must not import or call BrainCore in Phase 5.1."""
+    def test_server_brain_core_wiring_is_flag_gated(self):
+        """Phase 5.4 Order 8 wired the Brain path into server.py behind the
+        brain_core_enabled flag (default False). The invariant is no longer
+        'server has no brain reference' but 'any brain reference is flag-gated
+        and defaults off'."""
         server_path = backend_dir / "server.py"
         source = server_path.read_text(encoding='utf-8')
-        self.assertNotIn("brain_core", source,
-                         "server.py must not reference brain_core in Phase 5.1")
-        self.assertNotIn("BrainCore", source,
-                         "server.py must not reference BrainCore in Phase 5.1")
+        # Flag exists and defaults off.
+        self.assertIn('"brain_core_enabled": False', source)
+        # The intercept is gated by that flag.
+        self.assertIn('SETTINGS.get("brain_core_enabled", False)', source)
 
     def test_no_circular_imports(self):
         """brain.core package imports cleanly in one pass."""

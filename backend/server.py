@@ -389,7 +389,10 @@ DEFAULT_SETTINGS = {
     "printers": [],
     "kasa_devices": [],
     "camera_flipped": False,
-    "auto_capture_tasks": True
+    "auto_capture_tasks": True,
+    # Phase 5.4 Order 8: gate the cognitive (Brain) text path. Default False —
+    # when off, user_input behaves byte-identically to the legacy pipeline.
+    "brain_core_enabled": False
 }
 
 SETTINGS = DEFAULT_SETTINGS.copy()
@@ -592,6 +595,16 @@ async def _unified_shutdown(reason: str = "unknown"):
             authenticator.stop()
         except Exception as e:
             print(f"[LIFECYCLE] Authenticator stop error: {e}")
+
+    # 4b. P2 — Unbind the legacy dispatch closure (Phase 5.4 Order 8).
+    # Reverts the DI executor to inert so no stale session dispatch survives
+    # teardown. Idempotent; covers stop_audio, disconnect, and shutdown (all
+    # route through this unified path).
+    try:
+        _runtime_facade.legacy_executor.unbind()
+        print("[BRAIN] Legacy dispatch unbound from session executor")
+    except Exception as e:
+        print(f"[LIFECYCLE] Brain dispatch unbind error (non-fatal): {e}")
 
     # 5. Detach session and clear references
     _session_mgr.detach()
@@ -1308,6 +1321,26 @@ async def start_audio(sid, data=None):
         
         # ── Phase 3: Attach AudioLoop to SessionManager early ──
         _session_mgr.attach(audio_loop)
+
+        # ── P2 — Bind the legacy dispatch closure (Phase 5.4 Order 8) ──
+        # Bind the session dispatch into the DI-registered LegacyToolExecutor so
+        # a Brain-planned Task can execute through the same legacy handlers the
+        # voice path uses. Unbound again in stop_audio / disconnect.
+        #
+        # NOTE (flag-on caveat): the Gemini session becomes live inside
+        # audio_loop.run() (spawned below), so it is not yet established here.
+        # The dispatch closure's liveness guard therefore treats execution as
+        # not-yet-live until the session is up; the Brain path degrades safely
+        # to the legacy pipeline (handled=False) in that window. Refining the
+        # bind timing is deferred to the flag-on validation order. Flag OFF
+        # (the default) is unaffected — this binding is dormant.
+        try:
+            from core.legacy_dispatch import build_session_dispatch
+            _bc_dispatch = build_session_dispatch(audio_loop)
+            _runtime_facade.legacy_executor.bind(_bc_dispatch)
+            print("[BRAIN] Legacy dispatch bound to session executor")
+        except Exception as _bind_err:
+            print(f"[BRAIN] dispatch bind failed (non-fatal): {_bind_err}")
         
         # Phase D.3.a: Apply VAD settings from SETTINGS
         audio_loop.vad_min_speech_ms = SETTINGS.get('vad_min_speech_ms', 350)
@@ -1921,6 +1954,32 @@ async def user_input(sid, data):
         
         return  # Do NOT forward to model
     
+    # ========================================
+    # P1 — BRAIN CORE INTERCEPT (Phase 5.4 Order 8, flag-gated)
+    # ========================================
+    # When brain_core_enabled is ON and a live session exists, route the text
+    # through the cognitive pipeline. On handled=True the Brain executed the
+    # request (via the bound legacy dispatch) — emit acks and RETURN so the
+    # legacy fast-paths below do not also run (no double execution). On
+    # handled=False (unrecognized, executor unbound, or execution declined),
+    # fall through to the unchanged legacy pipeline. Flag OFF => this block is
+    # a single dict lookup then skip: byte-identical to legacy behavior.
+    if SETTINGS.get("brain_core_enabled", False):
+        _bc_loop = _session_mgr.audio_loop
+        if _bc_loop is not None and getattr(_bc_loop, "session", None) is not None:
+            try:
+                from brain.core.models import BrainRequest as _BrainRequest
+                _bc_result = await _runtime_facade.brain_core.handle(
+                    _BrainRequest(text=text, channel="text", sid=sid)
+                )
+                if _bc_result is not None and _bc_result.handled:
+                    print(f"[BRAIN] handled text request (plan tasks="
+                          f"{len(_bc_result.plan.tasks) if _bc_result.plan else 0})")
+                    return  # Brain executed it — do not run legacy fast-paths
+            except Exception as _bc_err:
+                # Never let the Brain path break the legacy pipeline — fall through.
+                print(f"[BRAIN] intercept error (non-fatal, falling through): {_bc_err}")
+
     # ========================================
     # VOICE COMMAND FAST-PATH (deterministic, no LLM)
     # Handles panel navigation locally before any Gemini/memory calls.

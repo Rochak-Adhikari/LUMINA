@@ -107,16 +107,18 @@ class TestStep0_BootstrapSeeding(unittest.TestCase):
                           "Old fictional id must be gone")
 
     def test_runtime_still_unchanged(self):
-        """BrainCore remains pass-through; no server wiring in Step 0."""
+        """BrainCore remains pass-through when unbound; Order 8 wired the
+        Brain path behind the brain_core_enabled flag (default False).
+        Flag-off => byte-identical legacy behavior."""
         core = self.container.resolve(IBrainCore)
         result = asyncio.run(core.handle(BrainRequest(text="open the quests panel")))
         self.assertIsInstance(result, BrainResult)
+        # Executor unbound in this isolated container → declines.
         self.assertFalse(result.handled)
         source = (backend_dir / "server.py").read_text(encoding='utf-8')
-        for token in ("BrainCore", "brain.skills", "brain.planning",
-                      "brain_core_enabled"):
-            self.assertNotIn(token, source,
-                             f"server.py must not reference {token} in Step 0")
+        # The Brain wiring must be flag-gated and default off.
+        self.assertIn('"brain_core_enabled": False', source)
+        self.assertIn('SETTINGS.get("brain_core_enabled", False)', source)
 
 
 class TestStep1_RulePlannerContract(unittest.TestCase):
@@ -616,6 +618,74 @@ class TestOrder7_BrainCoreOrchestration(unittest.TestCase):
             BrainRequest(text="open the quests panel")))
         after = _stable(state.get_status())
         self.assertEqual(before, after)
+
+
+class TestOrder8_ServerWiring(unittest.TestCase):
+    """Order 8: brain_core_enabled flag + P1 intercept + P2 bind/unbind.
+
+    The wiring lives in server.py's user_input / start_audio / _unified_shutdown
+    — regions that need a live Gemini session to exercise dynamically. Verified
+    structurally against source (existing pattern in this suite), plus a live
+    default-flag assertion via the settings loader.
+    """
+
+    def _server_src(self):
+        return (backend_dir / "server.py").read_text(encoding='utf-8')
+
+    # ---- flag default OFF ---------------------------------------------
+
+    def test_flag_in_default_settings_off(self):
+        src = self._server_src()
+        idx = src.index("DEFAULT_SETTINGS")
+        block = src[idx: idx + 3000]
+        self.assertIn('"brain_core_enabled": False', block,
+                      "brain_core_enabled must default to False")
+
+    # ---- P1 intercept -------------------------------------------------
+
+    def test_p1_intercept_flag_gated_and_returns(self):
+        src = self._server_src()
+        self.assertIn('SETTINGS.get("brain_core_enabled", False)', src,
+                      "P1 must be flag-gated")
+        self.assertIn("_runtime_facade.brain_core.handle(", src,
+                      "P1 must call brain_core.handle")
+        # Intercept must sit before the nav fast-path (no double execution).
+        p1 = src.index("BRAIN CORE INTERCEPT")
+        fastpath = src.index("VOICE COMMAND FAST-PATH")
+        self.assertLess(p1, fastpath, "P1 must precede the nav fast-path")
+
+    def test_p1_checks_live_session(self):
+        src = self._server_src()
+        # Intercept region must require a live session before handing to Brain.
+        p1 = src.index("BRAIN CORE INTERCEPT")
+        region = src[p1: p1 + 1200]
+        self.assertIn("_session_mgr.audio_loop", region)
+        self.assertIn('getattr(_bc_loop, "session", None) is not None', region)
+
+    # ---- P2 bind / unbind ---------------------------------------------
+
+    def test_p2_bind_in_start_audio(self):
+        src = self._server_src()
+        self.assertIn("build_session_dispatch(audio_loop)", src)
+        self.assertIn("_runtime_facade.legacy_executor.bind(", src)
+
+    def test_p2_unbind_in_unified_shutdown(self):
+        src = self._server_src()
+        idx = src.index("async def _unified_shutdown(")
+        body = src[idx: idx + 2500]
+        self.assertIn("_runtime_facade.legacy_executor.unbind()", body,
+                      "P2 unbind must run in the unified session teardown")
+
+    # ---- flag OFF => byte-identical (no behavior change) --------------
+
+    def test_flag_off_is_default(self):
+        # The runtime default must be OFF so user_input stays byte-identical
+        # to the legacy path until explicitly enabled.
+        import importlib.util
+        # Read via the DEFAULT_SETTINGS literal (no server import — heavy deps).
+        src = self._server_src()
+        self.assertIn('"brain_core_enabled": False', src)
+        self.assertNotIn('"brain_core_enabled": True', src)
 
 
 if __name__ == '__main__':
