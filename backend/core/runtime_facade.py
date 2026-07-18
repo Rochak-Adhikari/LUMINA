@@ -143,6 +143,20 @@ class RuntimeFacade:
         from brain.skills.manager import SkillManager
         return self._container.resolve(SkillManager)
 
+    @property
+    def llm_planner(self) -> Any:
+        """Resolve the registered LLMPlanner (Phase 5.3; inert until a
+        model gateway is bound)."""
+        from brain.planning.llm_planner import LLMPlanner
+        return self._container.resolve(LLMPlanner)
+
+    @property
+    def planner_chain(self) -> Any:
+        """Resolve the registered PlannerChain (Phase 5.3:
+        RulePlanner -> LLMPlanner fallback)."""
+        from brain.planning.llm_planner import PlannerChain
+        return self._container.resolve(PlannerChain)
+
     # ---- Adapters ------------------------------------------------------
 
     @property

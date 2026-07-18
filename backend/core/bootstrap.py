@@ -63,6 +63,8 @@ class Bootstrapper:
         self.planner: Optional[Any] = None
         self.skill_registry: Optional[Any] = None
         self.skill_manager: Optional[Any] = None
+        self.llm_planner: Optional[Any] = None
+        self.planner_chain: Optional[Any] = None
 
     def bootstrap(self) -> None:
         """Construct and register all services owned by this bootstrapper."""
@@ -252,6 +254,24 @@ class Bootstrapper:
         )
         self._container.register_instance(SkillManager, self.skill_manager)
         print("[DI] SkillManager registered (legacy executor unbound)")
+
+        # Phase 5.3: LLMPlanner + fallback chain. No IModelGateway
+        # implementation exists in the repository, so the LLM planner is
+        # registered UNBOUND (inert — plan() returns None). IPlanner keeps
+        # resolving RulePlanner; the chain has its own key until runtime
+        # wiring flips the binding in a later milestone.
+        from brain.planning.llm_planner import LLMPlanner, PlannerChain
+
+        self.llm_planner = LLMPlanner(
+            model_gateway=None,
+            skill_registry=self.skill_registry,
+        )
+        self._container.register_instance(LLMPlanner, self.llm_planner)
+        print("[DI] LLMPlanner registered (model gateway unbound)")
+
+        self.planner_chain = PlannerChain([self.planner, self.llm_planner])
+        self._container.register_instance(PlannerChain, self.planner_chain)
+        print("[DI] PlannerChain registered (RulePlanner -> LLMPlanner)")
 
     def _register_service_metadata(self) -> None:
         """
