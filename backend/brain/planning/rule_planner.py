@@ -28,10 +28,18 @@ intentional data duplication (brain/* may not import server.py).
 from __future__ import annotations
 
 import re
-from typing import Optional
+from typing import Any, Optional
 
 from brain.core.interfaces import IPlanner
 from brain.core.models import BrainContext, Plan, Task
+
+# Fallback skill id for navigation when no registry / no metadata match is
+# available (Migration Strategy: preserve current behavior → zero regression).
+_NAV_FALLBACK_SKILL_ID = "legacy.navigate_ui"
+# Metadata category used to DISCOVER the navigation capability (Phase 5.5
+# Step 3). Derived from SkillSpec tags; legacy.navigate_ui carries tag
+# "navigation" as its first tag → category "navigation".
+_NAV_CATEGORY = "navigation"
 
 # Canonical UI panels and their spoken aliases → canonical panel name.
 # Mirrors server.py nav fast-path vocabulary (quests/archive/events/settings/home).
@@ -70,6 +78,32 @@ _NAV_RE = re.compile(
 class RulePlanner(IPlanner):
     """Deterministic pattern-based planner."""
 
+    def __init__(self, skill_registry: Optional[Any] = None) -> None:
+        """
+        Phase 5.5 Step 3: optionally accept a SkillRegistry for metadata-driven
+        capability discovery. Backward-compatible — RulePlanner() with no args
+        keeps working and uses the hardcoded fallback (identical behavior).
+        """
+        self._registry = skill_registry
+
+    def _resolve_nav_skill_id(self) -> str:
+        """
+        Discover the navigation skill id via metadata (deterministic).
+
+        Queries the registry for the navigation capability and takes the first
+        match (registration-order preserving). Falls back to the hardcoded id
+        when no registry is injected or no capability matches — guaranteeing
+        zero runtime regression (Migration Strategy).
+        """
+        if self._registry is not None:
+            try:
+                candidates = self._registry.search(category=_NAV_CATEGORY)
+                if candidates:
+                    return candidates[0].id  # deterministic first match
+            except Exception:
+                pass
+        return _NAV_FALLBACK_SKILL_ID
+
     def plan(self, context: BrainContext) -> Optional[Plan]:
         """
         Evaluate navigation rules against the request text.
@@ -107,7 +141,7 @@ class RulePlanner(IPlanner):
 
         task = Task(
             intent="navigate",
-            skill_id="legacy.navigate_ui",
+            skill_id=self._resolve_nav_skill_id(),
             params={"panel": panel, "view": view},
         )
         return Plan(

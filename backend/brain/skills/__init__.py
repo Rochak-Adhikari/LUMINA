@@ -13,7 +13,12 @@ capabilities via metadata only. Nothing is wired into any runtime path.
 """
 
 from brain.skills.models import SkillSpec, SkillResult
+from brain.skills.metadata import SkillMetadata
 from brain.skills.registry import SkillRegistry
+from brain.skills.interfaces import ISkillRegistry
 from brain.skills.manager import SkillManager
 
-__all__ = ["SkillSpec", "SkillResult", "SkillRegistry", "SkillManager"]
+__all__ = [
+    "SkillSpec", "SkillResult", "SkillMetadata",
+    "SkillRegistry", "ISkillRegistry", "SkillManager",
+]
