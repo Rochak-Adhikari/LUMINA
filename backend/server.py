@@ -1515,13 +1515,19 @@ async def monitor_printers_loop():
 @sio.event
 async def stop_audio(sid):
     """
-    Phase 4.5: Stop audio session — delegates to ApplicationHost
-    unified lifecycle to ensure consistent cleanup.
+    Phase 4.5: Stop audio session.
+
+    Phase 5.4 Order 1 (B2 fix): run the session-scoped unified shutdown
+    directly instead of ApplicationHost.stop(). ApplicationHost.stop() flips
+    the host's _started flag off permanently (it is process-exit only); using
+    it here would silently no-op every later real shutdown. _unified_shutdown
+    performs the full session teardown (summary, AudioLoop, loop task,
+    authenticator, detach, event) without touching lifecycle state.
     """
     audio_loop = _session_mgr.audio_loop
     if audio_loop:
         print("Stopping Audio Loop via unified shutdown...")
-        await _app_host.stop()
+        await _unified_shutdown("stop_audio")
         await sio.emit('status', {'msg': 'Lumina Stopped'})
 
 @sio.event

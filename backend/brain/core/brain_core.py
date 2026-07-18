@@ -1,23 +1,34 @@
 """
-brain/core/brain_core.py — Phase 5.1 BrainCore orchestrator
+brain/core/brain_core.py — BrainCore orchestrator (Phase 5.4 Step 4)
 
 The single cognitive orchestration authority. BrainCore sequences the
 pipeline; it never contains business logic, planning, tool execution,
 memory mutation, reflection, or evolution — those are collaborator
-responsibilities added in later milestones.
+responsibilities.
 
-Phase 5.1 pipeline (skeleton):
+Pipeline:
     handle(request)
       1. Build BrainContext (ContextBuilder)
-      2. Return a pass-through BrainResult (handled=False)
+      2. Plan (injected planner — PlannerChain: Rule → LLM)
+      3. Execute each task (injected SkillManager)
+      4. Aggregate a BrainResult
 
-No runtime path calls this yet. Registered in DI by Bootstrapper and
-exposed via RuntimeFacade only.
+handled semantics (Phase 5.4 Step 4):
+  - No planner/manager injected, or plan is None   → handled=False (declined;
+    the caller falls through to the legacy path).
+  - Plan produced AND every task succeeds          → handled=True, plan set.
+  - Plan produced but any task fails               → handled=False (declined;
+    plan not attached — the legacy path handles the request).
+
+This keeps the layer DORMANT-SAFE: with the LegacyToolExecutor unbound (no
+live session), execution always fails, so handle() returns handled=False —
+identical to the skeleton's external contract. handled=True only occurs once
+a live dispatch is bound (Step 6). No runtime path calls handle() yet.
 """
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, List, Optional
 
 from core.interfaces import IEventBus
 from brain.core.interfaces import IBrainCore, IContextBuilder
@@ -26,48 +37,80 @@ from brain.core.models import BrainRequest, BrainResult
 
 class BrainCore(IBrainCore):
     """
-    Orchestrator skeleton.
+    Cognitive orchestrator.
 
-    Collaborators (Phase 5.1):
+    Collaborators (all injected):
       context_builder — required; builds BrainContext per request.
-      event_bus       — optional; publishes lifecycle events (non-fatal
-                        if publishing fails or bus is absent).
+      event_bus       — optional; publishes lifecycle events (non-fatal).
+      planner         — optional; produces a Plan (PlannerChain). When absent,
+                        handle() is a pass-through (handled=False).
+      skill_manager   — optional; executes a Task -> SkillResult. When absent,
+                        handle() is a pass-through (handled=False).
     """
 
     def __init__(
         self,
         context_builder: IContextBuilder,
         event_bus: Optional[IEventBus] = None,
+        planner: Optional[Any] = None,
+        skill_manager: Optional[Any] = None,
     ) -> None:
         self._context_builder = context_builder
         self._event_bus = event_bus
+        self._planner = planner
+        self._skill_manager = skill_manager
 
     async def handle(self, request: BrainRequest) -> BrainResult:
-        """
-        Process one BrainRequest.
-
-        Phase 5.1: builds context, publishes an observability event, and
-        returns a pass-through result. handled=False signals to callers
-        that no cognition occurred (planning/execution arrive in 5.2+).
-        """
+        """Process one BrainRequest (see module docstring for handled semantics)."""
         context = self._context_builder.build(request)
+        await self._publish("brain.request_received", request)
 
-        if self._event_bus is not None:
-            try:
-                await self._event_bus.publish(
-                    "brain.request_received",
-                    {
-                        "request_id": request.request_id,
-                        "channel": request.channel,
-                    },
-                )
-            except Exception:
-                # Observability only — never let event publishing break
-                # the pipeline (same policy as server.py event publishes).
-                pass
+        # No cognition collaborators → pass-through (declined).
+        if self._planner is None or self._skill_manager is None:
+            return BrainResult(request_id=request.request_id, handled=False)
 
-        return BrainResult(
-            request_id=context.request.request_id,
-            response_text="",
-            handled=False,
-        )
+        # 1. Plan (prefer the async path; fall back to sync plan()).
+        plan_fn = getattr(self._planner, "plan_async", None)
+        try:
+            if plan_fn is not None:
+                plan = await plan_fn(context)
+            else:
+                plan = self._planner.plan(context)
+        except Exception:
+            plan = None
+
+        if plan is None or not plan.tasks:
+            # Unrecognized → decline; the legacy path handles it.
+            return BrainResult(request_id=request.request_id, handled=False)
+
+        await self._publish("brain.plan_created", request)
+
+        # 2. Execute each task via SkillManager (never raises).
+        results: List[Any] = []
+        for task in plan.tasks:
+            results.append(await self._skill_manager.execute(task))
+
+        # 3. Aggregate. Full success → handled; otherwise decline (fall
+        #    through to legacy). Plan attached only when handled.
+        if results and all(getattr(r, "ok", False) for r in results):
+            await self._publish("brain.request_handled", request)
+            return BrainResult(
+                request_id=request.request_id,
+                handled=True,
+                plan=plan,
+                artifacts={"results": [getattr(r, "output", None) for r in results]},
+            )
+
+        return BrainResult(request_id=request.request_id, handled=False)
+
+    async def _publish(self, topic: str, request: BrainRequest) -> None:
+        """Best-effort event publish — never breaks the pipeline."""
+        if self._event_bus is None:
+            return
+        try:
+            await self._event_bus.publish(
+                topic,
+                {"request_id": request.request_id, "channel": request.channel},
+            )
+        except Exception:
+            pass

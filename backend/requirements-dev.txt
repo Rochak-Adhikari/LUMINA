@@ -1,0 +1,4 @@
+# Development / test dependencies (Phase 5.4 Order 5).
+# Install into the lumina conda env:
+#   python -m pip install -r requirements-dev.txt
+pytest>=8,<9

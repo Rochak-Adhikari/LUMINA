@@ -157,6 +157,15 @@ class RuntimeFacade:
         from brain.planning.llm_planner import PlannerChain
         return self._container.resolve(PlannerChain)
 
+    @property
+    def legacy_executor(self) -> Any:
+        """Resolve the registered LegacyToolExecutor (Phase 5.4 Step 5).
+
+        A session binds a dispatch closure into this instance at start and
+        unbinds at stop (Step 6). Unbound (inert) until then."""
+        from brain.skills.executors.legacy_tool_executor import LegacyToolExecutor
+        return self._container.resolve(LegacyToolExecutor)
+
     # ---- Adapters ------------------------------------------------------
 
     @property

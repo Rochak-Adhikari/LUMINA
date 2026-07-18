@@ -1306,43 +1306,62 @@ class AudioLoop:
                                         continue
 
                                 # If confirmed (or no callback configured, or auto-allowed), proceed
-                                if ToolDispatcherRegistry.contains(fc.name):
-                                    handler = ToolDispatcherRegistry.get(fc.name)
-                                    try:
-                                        res = await handler(fc, self)
-                                        if res is not None:
-                                            function_response = types.FunctionResponse(
-                                                id=fc.id, name=fc.name, response=res
-                                            )
-                                            function_responses.append(function_response)
-                                    except Exception as e:
-                                        print(f"[LUMINA DEBUG] [ERR] Handler error for '{fc.name}': {e}")
-                                        traceback.print_exc()
+                                # (dispatch dedented below so it runs for EVERY registered tool,
+                                #  not only those in the permission-gate sets — B1 fix)
+
+                            # ── DISPATCH (Phase 5.4 Order 1 / B1 fix) ──────────────
+                            # Runs for every function call that reaches here. Tools in
+                            # the permission-gate sets above may have already appended a
+                            # denial and 'continue'd; those that proceed, plus registered
+                            # tools that are not in either gate set (e.g. navigate_ui),
+                            # dispatch here. Unknown tools get an explicit response so
+                            # Gemini's turn never stalls waiting for a missing reply.
+                            if ToolDispatcherRegistry.contains(fc.name):
+                                handler = ToolDispatcherRegistry.get(fc.name)
+                                try:
+                                    res = await handler(fc, self)
+                                    if res is not None:
                                         function_response = types.FunctionResponse(
-                                            id=fc.id, name=fc.name, response={"result": f"Error running tool: {e}"}
+                                            id=fc.id, name=fc.name, response=res
                                         )
                                         function_responses.append(function_response)
-
-                                elif fc.name in ACTION_REGISTRY:
-                                    print(f"[LUMINA] [ACTION] Tool Call: '{fc.name}' args={str(fc.args)[:120]}")
-                                    _action_fn = ACTION_REGISTRY[fc.name]
-                                    _action_params = dict(fc.args)  # args is a Mapping
-                                    try:
-                                        _action_result = await asyncio.to_thread(
-                                            _action_fn,
-                                            _action_params,
-                                            None,       # response arg (unused in Lumina)
-                                            None,       # player arg (unused in Lumina)
-                                            self.memory_store  # session_memory
-                                        )
-                                    except Exception as _ae:
-                                        _action_result = f"Action error: {_ae}"
-                                        print(f"[LUMINA] [ACTION] Error in '{fc.name}': {_ae}")
+                                except Exception as e:
+                                    print(f"[LUMINA DEBUG] [ERR] Handler error for '{fc.name}': {e}")
+                                    traceback.print_exc()
                                     function_response = types.FunctionResponse(
-                                        id=fc.id, name=fc.name,
-                                        response={"result": str(_action_result)}
+                                        id=fc.id, name=fc.name, response={"result": f"Error running tool: {e}"}
                                     )
                                     function_responses.append(function_response)
+
+                            elif fc.name in ACTION_REGISTRY:
+                                print(f"[LUMINA] [ACTION] Tool Call: '{fc.name}' args={str(fc.args)[:120]}")
+                                _action_fn = ACTION_REGISTRY[fc.name]
+                                _action_params = dict(fc.args)  # args is a Mapping
+                                try:
+                                    _action_result = await asyncio.to_thread(
+                                        _action_fn,
+                                        _action_params,
+                                        None,       # response arg (unused in Lumina)
+                                        None,       # player arg (unused in Lumina)
+                                        self.memory_store  # session_memory
+                                    )
+                                except Exception as _ae:
+                                    _action_result = f"Action error: {_ae}"
+                                    print(f"[LUMINA] [ACTION] Error in '{fc.name}': {_ae}")
+                                function_response = types.FunctionResponse(
+                                    id=fc.id, name=fc.name,
+                                    response={"result": str(_action_result)}
+                                )
+                                function_responses.append(function_response)
+
+                            else:
+                                # Unregistered tool — explicit response so the turn
+                                # never stalls waiting for a reply that never comes.
+                                print(f"[LUMINA] [TOOL] Unknown tool '{fc.name}' — no handler registered.")
+                                function_responses.append(types.FunctionResponse(
+                                    id=fc.id, name=fc.name,
+                                    response={"result": f"Unknown tool '{fc.name}' — no handler available."}
+                                ))
 
                         if function_responses:
                             await self.session.send_tool_response(function_responses=function_responses)

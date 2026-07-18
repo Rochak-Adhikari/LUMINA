@@ -29,6 +29,31 @@ class LegacyToolExecutor:
     def __init__(self, dispatch: Optional[Callable[..., Any]] = None) -> None:
         self._dispatch = dispatch
 
+    def bind(self, dispatch: Callable[..., Any]) -> None:
+        """
+        Bind a session-scoped dispatch callable (Phase 5.4 Step 3).
+
+        Called at session start with a closure that reproduces the legacy
+        two-tier dispatch (see core/legacy_dispatch.build_session_dispatch).
+        The executor instance is bootstrap-scoped; only this binding is
+        session-scoped.
+        """
+        self._dispatch = dispatch
+
+    def unbind(self) -> None:
+        """
+        Clear the dispatch binding (Phase 5.4 Step 3).
+
+        Called at session end so the executor reverts to its inert state
+        (run() returns a failed SkillResult). Idempotent.
+        """
+        self._dispatch = None
+
+    @property
+    def is_bound(self) -> bool:
+        """True when a dispatch callable is currently bound."""
+        return self._dispatch is not None
+
     def supports(self, spec: SkillSpec) -> bool:
         """True if this executor can run *spec*."""
         return spec.provider == self.provider

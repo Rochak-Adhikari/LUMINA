@@ -225,7 +225,7 @@ class TestPhase5_3_Chain(unittest.TestCase):
         chain, gw = self._chain('{"tasks": []}')
         plan = chain.plan(_ctx("open the settings panel"))
         self.assertIsNotNone(plan)
-        self.assertEqual(plan.tasks[0].skill_id, "legacy.navigation")
+        self.assertEqual(plan.tasks[0].skill_id, "legacy.navigate_ui")
         self.assertEqual(gw.calls, [],
                          "LLM gateway must NOT be called when RulePlanner matches")
 

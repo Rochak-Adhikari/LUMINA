@@ -128,26 +128,21 @@ class TestPhase5_2_RulePlanner(unittest.TestCase):
         plan = self.planner.plan(_ctx("open the quests panel"))
         self.assertIsInstance(plan, Plan)
         self.assertEqual(len(plan.tasks), 1)
-        self.assertEqual(plan.tasks[0].skill_id, "legacy.navigation")
+        self.assertEqual(plan.tasks[0].skill_id, "legacy.navigate_ui")
         self.assertEqual(plan.tasks[0].intent, "navigate")
-        self.assertEqual(plan.tasks[0].params.get("target"), "quests")
+        self.assertEqual(plan.tasks[0].params.get("panel"), "quests")
+        self.assertEqual(plan.tasks[0].params.get("view"), "all")
 
-    def test_memory_remember(self):
-        plan = self.planner.plan(_ctx("remember that I prefer dark mode"))
-        self.assertIsNotNone(plan)
-        self.assertEqual(plan.tasks[0].skill_id, "legacy.memory")
-        self.assertEqual(plan.tasks[0].intent, "memory.remember")
-        self.assertEqual(plan.tasks[0].params.get("content"), "I prefer dark mode")
+    def test_memory_verbs_not_planned(self):
+        # Phase 5.4 Step 1: no dispatchable memory tool exists; memory verbs
+        # are handled by the legacy inline path, not planned here.
+        self.assertIsNone(self.planner.plan(_ctx("remember that I prefer dark mode")))
+        self.assertIsNone(self.planner.plan(_ctx("forget about my old address")))
+        self.assertIsNone(self.planner.plan(_ctx("what do you remember about me?")))
 
-    def test_memory_forget_and_recall(self):
-        self.assertEqual(
-            self.planner.plan(_ctx("forget about my old address")).tasks[0].intent,
-            "memory.forget",
-        )
-        self.assertEqual(
-            self.planner.plan(_ctx("what do you remember about me?")).tasks[0].intent,
-            "memory.recall",
-        )
+    def test_unknown_panel_returns_none(self):
+        # Navigation target that maps to no real panel → abstain.
+        self.assertIsNone(self.planner.plan(_ctx("open the fridge")))
 
     def test_unknown_returns_none(self):
         self.assertIsNone(self.planner.plan(_ctx("write me a haiku about rain")))

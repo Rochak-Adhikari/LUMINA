@@ -6,7 +6,12 @@ from core.registry import (
     ToolRegistry,
     ToolDispatcherRegistry,
 )
-import core.tool_handlers
+
+# Phase 5.4 Order 4 (D2): the `import core.tool_handlers` side-effect import
+# (which registers Tier-1 handlers AND drags the Gemini SDK) was relocated to
+# core/bootstrap.py so the core package no longer transitively imports a model
+# SDK. bootstrap.py runs once at startup before any tool dispatch, so Tier-1
+# registration is unchanged. Tests that need the handlers import it directly.
 
 # Phase 1.1 — Interface layer and DI container
 from core.interfaces import (

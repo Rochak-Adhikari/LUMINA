@@ -67,11 +67,16 @@ class LLMPlanner(IPlanner):
 
     def plan(self, context: BrainContext) -> Optional[Plan]:
         """
-        Produce a Plan for *context* via the injected model gateway.
+        Produce a Plan for *context* via the injected model gateway (sync).
 
         Returns None when: no gateway bound, empty text, voice_tool request
         (pre-decided upstream), model failure, unparseable output, or the
         model itself returns an empty task list.
+
+        NOTE: inside a running event loop, prefer plan_async(). The sync path
+        cannot drive an async gateway from within a running loop (it would
+        require a nested asyncio.run); in that case it returns None rather
+        than raising (never-raise contract).
         """
         if self._gateway is None:
             return None
@@ -82,6 +87,27 @@ class LLMPlanner(IPlanner):
         prompt = self._build_prompt(text)
         try:
             raw = self._generate_sync(prompt)
+        except Exception:
+            return None
+        return self._parse_plan(raw)
+
+    async def plan_async(self, context: BrainContext) -> Optional[Plan]:
+        """
+        Async variant of plan() — safe to call from within a running event
+        loop (fixes D4: no nested asyncio.run).
+
+        Same guards and same never-raise contract as plan(). This is the path
+        BrainCore uses when orchestrating inside the server loop.
+        """
+        if self._gateway is None:
+            return None
+        text = (context.request.text or "").strip()
+        if not text or context.request.tool_call is not None:
+            return None
+
+        prompt = self._build_prompt(text)
+        try:
+            raw = await self._generate_async(prompt)
         except Exception:
             return None
         return self._parse_plan(raw)
@@ -105,9 +131,15 @@ class LLMPlanner(IPlanner):
 
     def _generate_sync(self, prompt: str) -> str:
         """
-        Call the gateway. IModelGateway.generate_text is declared async;
-        run it to completion here so plan() keeps the synchronous IPlanner
-        contract. A sync-returning fake/gateway is also accepted.
+        Call the gateway synchronously.
+
+        IModelGateway.generate_text is declared async; when it returns an
+        awaitable this method must drive it to completion. It may only do so
+        (via asyncio.run) when NO event loop is running — driving an awaitable
+        with a nested asyncio.run inside a running loop raises RuntimeError
+        (D4). Inside a running loop, callers must use plan_async() instead;
+        this method raises internally there and plan() maps it to None.
+        A sync-returning gateway is also accepted.
         """
         outcome = self._gateway.generate_text(
             prompt,
@@ -116,7 +148,31 @@ class LLMPlanner(IPlanner):
         )
         if hasattr(outcome, "__await__"):
             import asyncio
-            return asyncio.run(_await(outcome))
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                # No running loop — safe to drive the awaitable to completion.
+                return asyncio.run(_await(outcome))
+            # Running loop present — cannot nest asyncio.run. Signal the caller
+            # (plan() catches this and returns None); use plan_async() here.
+            raise RuntimeError(
+                "LLMPlanner._generate_sync cannot drive an async gateway "
+                "inside a running event loop; use plan_async()."
+            )
+        return outcome
+
+    async def _generate_async(self, prompt: str) -> str:
+        """
+        Call the gateway and await an async result if needed. Loop-safe:
+        never uses asyncio.run. Accepts both async and sync gateways.
+        """
+        outcome = self._gateway.generate_text(
+            prompt,
+            system_instruction=_SYSTEM_INSTRUCTION,
+            temperature=self._temperature,
+        )
+        if hasattr(outcome, "__await__"):
+            return await outcome
         return outcome
 
     def _parse_plan(self, raw: Any) -> Optional[Plan]:
@@ -180,6 +236,22 @@ class PlannerChain(IPlanner):
     def plan(self, context: BrainContext) -> Optional[Plan]:
         for planner in self._planners:
             result = planner.plan(context)
+            if result is not None:
+                return result
+        return None
+
+    async def plan_async(self, context: BrainContext) -> Optional[Plan]:
+        """
+        Async variant of plan(). Awaits each planner's plan_async() when it
+        offers one; otherwise falls back to its synchronous plan(). First
+        non-None Plan wins. Loop-safe (no nested asyncio.run).
+        """
+        for planner in self._planners:
+            fn = getattr(planner, "plan_async", None)
+            if fn is not None:
+                result = await fn(context)
+            else:
+                result = planner.plan(context)
             if result is not None:
                 return result
         return None

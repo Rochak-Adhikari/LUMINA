@@ -32,6 +32,14 @@ from core.metadata import (
     LIFECYCLE_SINGLETON,
 )
 
+# Phase 5.4 Order 4 (D2): tool-handler registration relocated here from
+# core/__init__.py. Importing core.tool_handlers has the side effect of
+# registering all Tier-1 handlers into ToolDispatcherRegistry (and pulls in
+# the Gemini SDK). Doing it here — where the composition root already runs
+# once at startup, before any tool dispatch — keeps the model SDK out of the
+# core package spine while preserving Tier-1 tool registration exactly.
+import core.tool_handlers  # noqa: F401 — side-effect: populates ToolDispatcherRegistry
+
 
 class Bootstrapper:
     """
@@ -63,6 +71,7 @@ class Bootstrapper:
         self.planner: Optional[Any] = None
         self.skill_registry: Optional[Any] = None
         self.skill_manager: Optional[Any] = None
+        self.legacy_executor: Optional[Any] = None
         self.llm_planner: Optional[Any] = None
         self.planner_chain: Optional[Any] = None
 
@@ -77,8 +86,8 @@ class Bootstrapper:
         self._register_execution_context_factory()
         self._register_pipeline()
         self._register_adapters()
-        self._register_brain_core()
         self._register_planning_and_skills()
+        self._register_brain_core()
         self._register_service_metadata()
 
         # Phase 4.5: Register ApplicationHost as a singleton so it's accessible
@@ -198,12 +207,17 @@ class Bootstrapper:
 
     def _register_brain_core(self) -> None:
         """
-        Phase 5.1: Register the cognitive skeleton — ContextBuilder and
-        BrainCore — under their interfaces.
+        Register the cognitive core — ContextBuilder and BrainCore.
+
+        Phase 5.4 Step 4/5: BrainCore now receives the PlannerChain and
+        SkillManager registered by _register_planning_and_skills() (which runs
+        first). Orchestration stays DORMANT-SAFE: the LegacyToolExecutor is
+        unbound until a session binds it (Step 6), so execution fails and
+        handle() returns handled=False — identical to the prior skeleton
+        contract. No runtime path resolves IBrainCore yet.
 
         Imported locally (like MemoryStore/ProjectManager above) to keep
-        module import order flat. No runtime path resolves IBrainCore yet;
-        this is scaffolding for Phase 5.2+.
+        module import order flat.
         """
         from brain.core.interfaces import IBrainCore, IContextBuilder
         from brain.core.context_builder import ContextBuilder
@@ -216,9 +230,11 @@ class Bootstrapper:
         self.brain_core = BrainCore(
             context_builder=self.context_builder,
             event_bus=self.event_bus,
+            planner=self.planner_chain,
+            skill_manager=self.skill_manager,
         )
         self._container.register_instance(IBrainCore, self.brain_core)
-        print("[DI] IBrainCore -> BrainCore registered")
+        print("[DI] IBrainCore -> BrainCore registered (planner+manager injected)")
 
     def _register_planning_and_skills(self) -> None:
         """
@@ -248,9 +264,16 @@ class Bootstrapper:
         self._container.register_instance(SkillRegistry, self.skill_registry)
         print(f"[DI] SkillRegistry registered ({seeded} builtin skills seeded)")
 
+        # Phase 5.4 Step 5: keep a reference to the executor and register it so
+        # RuntimeFacade can expose it. A session binds a dispatch closure into
+        # this instance at start (Step 6); it is unbound (inert) until then.
+        self.legacy_executor = LegacyToolExecutor(dispatch=None)
+        self._container.register_instance(LegacyToolExecutor, self.legacy_executor)
+        print("[DI] LegacyToolExecutor registered (unbound)")
+
         self.skill_manager = SkillManager(
             registry=self.skill_registry,
-            executors=[LegacyToolExecutor(dispatch=None)],
+            executors=[self.legacy_executor],
         )
         self._container.register_instance(SkillManager, self.skill_manager)
         print("[DI] SkillManager registered (legacy executor unbound)")

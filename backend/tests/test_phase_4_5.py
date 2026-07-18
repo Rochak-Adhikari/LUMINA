@@ -217,13 +217,28 @@ class TestPhase4_5_No_Duplicate_Shutdown_Paths(unittest.TestCase):
         self.assertGreater(len(shutdown_functions), 0,
                           "Must find at least one shutdown handler")
 
-        # Each should call _app_host.stop() and NOT perform inline cleanup
+        # Each shutdown handler must route through the unified lifecycle and
+        # NOT inline old cleanup patterns.
+        #
+        # Phase 5.4 Order 1 (B2 fix): process-exit handlers (shutdown_event,
+        # shutdown) delegate to ApplicationHost.stop(); the session-scoped
+        # stop_audio delegates to _unified_shutdown() directly. Using
+        # ApplicationHost.stop() from stop_audio would flip the host's
+        # _started flag off permanently and silently no-op every later real
+        # shutdown — so stop_audio must NOT call it.
         for func_name, func_node in shutdown_functions.items():
             func_source = ast.unparse(func_node)
 
-            # Must call _app_host.stop()
-            self.assertIn("_app_host.stop()", func_source,
-                         f"{func_name} must delegate to ApplicationHost.stop()")
+            if func_name == 'stop_audio':
+                # Session-scoped teardown, not lifecycle disarm.
+                self.assertIn("_unified_shutdown", func_source,
+                             "stop_audio must delegate to _unified_shutdown (B2 fix)")
+                self.assertNotIn("_app_host.stop()", func_source,
+                             "stop_audio must NOT call ApplicationHost.stop() (B2 fix)")
+            else:
+                # Process-exit handlers still route through ApplicationHost.
+                self.assertIn("_app_host.stop()", func_source,
+                             f"{func_name} must delegate to ApplicationHost.stop()")
 
             # Must NOT inline old cleanup patterns
             bad_patterns = [
