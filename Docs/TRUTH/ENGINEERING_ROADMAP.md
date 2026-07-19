@@ -90,6 +90,14 @@ See `Docs/TRUTH/ARCHITECTURE.md` and
 
 **Status: NOT STARTED**
 
+The Evolution Engine observes and recommends. It never mutates runtime. It
+observes execution, measures performance, analyzes outcomes, evaluates
+strategies, and produces immutable recommendations and evolution metadata. It
+never rewrites BrainCore, the Planner, Workspace, prompts, or skills, and never
+changes runtime behavior. Phase 6 is the FOUNDATION for future evolution: it
+decides WHAT should evolve. Phase 7 (Skill Creator) consumes Phase 6
+recommendations and performs the approved evolution.
+
 - Reflection Learning
 - Strategy Improvement
 - Performance Analysis
@@ -102,6 +110,10 @@ See `Docs/TRUTH/ARCHITECTURE.md` and
 ### Phase 7.0 — Skill Creator
 
 **Status: NOT STARTED**
+
+Phase 7 consumes Phase 6 recommendations and performs the approved evolution.
+Phase 6 decides WHAT should evolve; Phase 7 performs it. This separation is
+permanent.
 
 - Dynamic Skill Generation
 - Skill Validation

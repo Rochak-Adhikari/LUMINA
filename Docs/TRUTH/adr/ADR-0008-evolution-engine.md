@@ -11,10 +11,12 @@ runtime. The frozen core (BrainCore, PlannerChain, ContextBuilder,
 WorkspaceMemory, WorkspaceRetriever, Recall, Prompt Builder, RuntimeFacade, DI
 Container, EventBus, Execution Pipeline) is authoritative and must not change.
 
-The Evolution Engine LEARNS FROM the runtime instead of rewriting it. It
-observes execution outcomes (via Reflection), analyzes performance, evaluates
-strategies, and produces RECOMMENDATIONS and evolved METADATA. It never mutates
-runtime state, never rewrites planners, never changes execution.
+**The Evolution Engine is an analysis layer, NOT a runtime mutation layer.** It
+LEARNS FROM the runtime instead of rewriting it. It observes execution outcomes
+(via Reflection), analyzes performance, evaluates strategies, and produces
+RECOMMENDATIONS and evolved METADATA. It never mutates runtime state, never
+rewrites planners, never changes execution. Phase 6 decides WHAT should evolve;
+the approved evolution is performed later by Phase 7 (Skill Creator).
 
 ## Architecture
 
@@ -101,6 +103,9 @@ versioned metadata — never a direct write.
 ## Design Principles
 
 - Observe, analyze, recommend — never rewrite the runtime.
+- The Evolution Engine is an analysis layer, NOT a runtime mutation layer.
+- **Evolution recommendations are immutable. Only future approved systems
+  (Phase 7 Skill Creator, behind human approval) may consume them.**
 - Read-only over all frozen components.
 - Deterministic analysis (no hidden randomness; timestamps supplied, not generated inline).
 - Append-only evolution records and metadata (versioned, never overwritten).

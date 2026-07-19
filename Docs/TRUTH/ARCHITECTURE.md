@@ -49,6 +49,32 @@ generation. Prompt builders MUST NEVER receive `WorkspaceMemory`,
 `WorkspaceMemoryManager` / Store, Recall services, `WorkspaceRecallContext`,
 `WorkspaceSync` / Activation, or any runtime/mutable object. See ADR-0007.
 
+## Evolution Engine Dependency Graph (Phase 6 — planned)
+
+The Evolution Engine is an analysis layer. It observes and recommends; it never
+mutates runtime. Recommendations flow forward to Phase 7 (Skill Creator), which
+performs the approved evolution behind human approval. Reference:
+`Docs/TRUTH/adr/ADR-0008-evolution-engine.md`,
+`Docs/TRUTH/PHASE_6_ROADMAP.md`.
+
+```
+Execution
+   ↓
+Reflection
+   ↓
+Evolution Engine        (observe / analyze / evaluate / recommend)
+   ↓
+Recommendations         (immutable)
+   ↓
+Phase 7 Skill Creator   (consumes approved recommendations)
+   ↓
+Approved Metadata
+```
+
+The Evolution Engine NEVER flows into runtime mutation. There is no
+`Evolution Engine → runtime mutation` edge. The only path from recommendations
+to runtime is through Phase 7, behind human approval.
+
 ## Status
 
 Phase 5.9 — Workspace Reasoning: **COMPLETE · VALIDATED · FROZEN**.

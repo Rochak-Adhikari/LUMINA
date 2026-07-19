@@ -93,6 +93,7 @@ class Bootstrapper:
         self._register_planning_and_skills()
         self._register_workspace_memory()
         self._register_reflection()
+        self._register_evolution()
         self._register_brain_core()
         self._register_service_metadata()
 
@@ -294,6 +295,71 @@ class Bootstrapper:
         self._container.register_instance(IReflectionEngine, self.reflection_engine)
         self._container.register_instance(ReflectionEngine, self.reflection_engine)
         print("[DI] ReflectionEngine registered (dormant)")
+
+    def _register_evolution(self) -> None:
+        """
+        Phase 6.1: Register the Evolution observation layer (dormant).
+
+        EvolutionStore (append-only) + EvolutionObserver (Reflection →
+        EvolutionObservation → store). ANALYSIS layer only (ADR-0008): observes
+        and persists; never mutates runtime. No consumer yet — no runtime path
+        invokes the observer. Registered under interface + concrete type,
+        mirroring the reflection/workspace registration style.
+        """
+        from brain.evolution.interfaces import IEvolutionStore, IEvolutionObserver
+        from brain.evolution.store import EvolutionStore
+        from brain.evolution.observer import EvolutionObserver
+
+        self.evolution_store = EvolutionStore()
+        self.evolution_observer = EvolutionObserver(self.evolution_store)
+        self._container.register_instance(IEvolutionStore, self.evolution_store)
+        self._container.register_instance(EvolutionStore, self.evolution_store)
+        self._container.register_instance(IEvolutionObserver, self.evolution_observer)
+        self._container.register_instance(EvolutionObserver, self.evolution_observer)
+        print("[DI] EvolutionObserver registered (dormant)")
+
+        # Phase 6.2: StrategyEvaluator — deterministic analysis over stored
+        # observations. Reads EvolutionStore only; never Reflection. Dormant.
+        from brain.evolution.interfaces import IStrategyEvaluator
+        from brain.evolution.evaluator import StrategyEvaluator
+
+        self.strategy_evaluator = StrategyEvaluator(self.evolution_store)
+        self._container.register_instance(IStrategyEvaluator, self.strategy_evaluator)
+        self._container.register_instance(StrategyEvaluator, self.strategy_evaluator)
+        print("[DI] StrategyEvaluator registered (dormant)")
+
+        # Phase 6.3: PerformanceAnalyzer — deterministic measurement over a
+        # StrategyAnalysis. Consumes StrategyAnalysis only; never Reflection,
+        # observations, or the store. Stateless. Dormant.
+        from brain.evolution.interfaces import IPerformanceAnalyzer
+        from brain.evolution.analyzer import PerformanceAnalyzer
+
+        self.performance_analyzer = PerformanceAnalyzer()
+        self._container.register_instance(IPerformanceAnalyzer, self.performance_analyzer)
+        self._container.register_instance(PerformanceAnalyzer, self.performance_analyzer)
+        print("[DI] PerformanceAnalyzer registered (dormant)")
+
+        # Phase 6.4: MemoryConsolidator — read-only consolidation proposer over
+        # a memory snapshot. Never writes memory; descriptive proposals only.
+        # Stateless. Dormant.
+        from brain.evolution.interfaces import IMemoryConsolidator
+        from brain.evolution.consolidator import MemoryConsolidator
+
+        self.memory_consolidator = MemoryConsolidator()
+        self._container.register_instance(IMemoryConsolidator, self.memory_consolidator)
+        self._container.register_instance(MemoryConsolidator, self.memory_consolidator)
+        print("[DI] MemoryConsolidator registered (dormant)")
+
+        # Phase 6.5: RecommendationEngine (Self Evolution) — decides WHAT should
+        # evolve. Consumes PerformanceAnalysis + ConsolidationProposalSet only;
+        # never performs evolution. Stateless. Dormant.
+        from brain.evolution.interfaces import IRecommendationEngine
+        from brain.evolution.recommender import RecommendationEngine
+
+        self.recommendation_engine = RecommendationEngine()
+        self._container.register_instance(IRecommendationEngine, self.recommendation_engine)
+        self._container.register_instance(RecommendationEngine, self.recommendation_engine)
+        print("[DI] RecommendationEngine registered (dormant)")
 
     def _register_planning_and_skills(self) -> None:
         """

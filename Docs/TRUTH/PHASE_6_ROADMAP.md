@@ -7,6 +7,10 @@ The Evolution Engine observes, analyzes, and recommends. It NEVER rewrites the
 frozen runtime. Every milestone below ships DORMANT (no DI, no runtime consumer,
 runtime byte-identical) until an explicit post-6.6 activation.
 
+**This phase builds the intelligence required for future self-evolution. It does
+not perform evolution.** Phase 6 decides WHAT should evolve and emits immutable
+recommendations; the approved evolution is performed later by Phase 7.
+
 Frozen and untouchable across ALL milestones: BrainCore, PlannerChain,
 ContextBuilder, WorkspaceMemory, WorkspaceRetriever, Recall, Prompt Builder,
 RuntimeFacade, DI Container, EventBus, Execution Pipeline.
@@ -173,3 +177,17 @@ Updated strategy metadata (versioned, append-only; runtime-visible only post-app
 - ADR-0008 satisfied; 6.6 audit passes.
 - Marked COMPLETE · VALIDATED · FROZEN. No runtime activation until an explicit
   post-6.6 phase.
+
+## Relationship with Phase 7
+
+Phase 6 and Phase 7 are permanently separated:
+
+- **Phase 6 (Evolution Engine)** produces recommendations. It observes,
+  measures, analyzes, evaluates, and emits immutable recommendation records and
+  evolution metadata. It decides WHAT should evolve. It never mutates runtime.
+- **Phase 7 (Skill Creator)** consumes those recommendations. It performs the
+  approved evolution — dynamic skill generation, validation, packaging,
+  installation, and registry updates — behind human approval.
+
+Phase 6 decides WHAT should evolve; Phase 7 performs the approved evolution.
+Recommendations flow one way (6 → 7); Phase 6 never performs the change itself.
