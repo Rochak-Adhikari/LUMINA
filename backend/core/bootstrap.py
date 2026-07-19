@@ -77,6 +77,7 @@ class Bootstrapper:
         self.workspace_memory_store: Optional[Any] = None
         self.workspace_memory_manager: Optional[Any] = None
         self.workspace_sync: Optional[Any] = None
+        self.reflection_engine: Optional[Any] = None
 
     def bootstrap(self) -> None:
         """Construct and register all services owned by this bootstrapper."""
@@ -91,6 +92,7 @@ class Bootstrapper:
         self._register_adapters()
         self._register_planning_and_skills()
         self._register_workspace_memory()
+        self._register_reflection()
         self._register_brain_core()
         self._register_service_metadata()
 
@@ -239,6 +241,7 @@ class Bootstrapper:
             event_bus=self.event_bus,
             planner=self.planner_chain,
             skill_manager=self.skill_manager,
+            reflection_engine=self.reflection_engine,
         )
         self._container.register_instance(IBrainCore, self.brain_core)
         print("[DI] IBrainCore -> BrainCore registered (planner+manager injected)")
@@ -274,6 +277,23 @@ class Bootstrapper:
         self.workspace_sync = WorkspaceSync(self.workspace_memory_manager)
         self._container.register_instance(WorkspaceSync, self.workspace_sync)
         print("[DI] WorkspaceSync registered (dormant)")
+
+    def _register_reflection(self) -> None:
+        """
+        Phase 5.7.3: Register the ReflectionEngine (dormant).
+
+        Pure, deterministic, read-only post-execution evaluator. Owns no
+        runtime state. No consumer yet — BrainCore integration is a later
+        milestone (5.7.4). Registered under both its interface and concrete
+        type, mirroring the workspace-service registration style.
+        """
+        from brain.reflection.interfaces import IReflectionEngine
+        from brain.reflection.engine import ReflectionEngine
+
+        self.reflection_engine = ReflectionEngine()
+        self._container.register_instance(IReflectionEngine, self.reflection_engine)
+        self._container.register_instance(ReflectionEngine, self.reflection_engine)
+        print("[DI] ReflectionEngine registered (dormant)")
 
     def _register_planning_and_skills(self) -> None:
         """

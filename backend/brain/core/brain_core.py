@@ -32,7 +32,7 @@ from typing import Any, List, Optional
 
 from core.interfaces import IEventBus
 from brain.core.interfaces import IBrainCore, IContextBuilder
-from brain.core.models import BrainRequest, BrainResult
+from brain.core.models import BrainRequest, BrainResult, Reflection
 
 
 class BrainCore(IBrainCore):
@@ -40,12 +40,16 @@ class BrainCore(IBrainCore):
     Cognitive orchestrator.
 
     Collaborators (all injected):
-      context_builder — required; builds BrainContext per request.
-      event_bus       — optional; publishes lifecycle events (non-fatal).
-      planner         — optional; produces a Plan (PlannerChain). When absent,
-                        handle() is a pass-through (handled=False).
-      skill_manager   — optional; executes a Task -> SkillResult. When absent,
-                        handle() is a pass-through (handled=False).
+      context_builder   — required; builds BrainContext per request.
+      event_bus         — optional; publishes lifecycle events (non-fatal).
+      planner           — optional; produces a Plan (PlannerChain). When absent,
+                          handle() is a pass-through (handled=False).
+      skill_manager     — optional; executes a Task -> SkillResult. When absent,
+                          handle() is a pass-through (handled=False).
+      reflection_engine — optional; read-only post-execution evaluator (5.7.4).
+                          After execution finishes, produces a Reflection
+                          attached to BrainResult.reflection. Never affects
+                          handling; failure inside it is swallowed (→ None).
     """
 
     def __init__(
@@ -54,11 +58,13 @@ class BrainCore(IBrainCore):
         event_bus: Optional[IEventBus] = None,
         planner: Optional[Any] = None,
         skill_manager: Optional[Any] = None,
+        reflection_engine: Optional[Any] = None,
     ) -> None:
         self._context_builder = context_builder
         self._event_bus = event_bus
         self._planner = planner
         self._skill_manager = skill_manager
+        self._reflection_engine = reflection_engine
 
     async def handle(self, request: BrainRequest) -> BrainResult:
         """Process one BrainRequest (see module docstring for handled semantics)."""
@@ -90,6 +96,10 @@ class BrainCore(IBrainCore):
         for task in plan.tasks:
             results.append(await self._skill_manager.execute(task))
 
+        # Reflection (5.7.4): read-only, exactly once, after execution. Never
+        # affects handling; failure → reflection=None.
+        reflection = self._reflect(request, plan, results, context)
+
         # 3. Aggregate. Full success → handled; otherwise decline (fall
         #    through to legacy). Plan attached only when handled.
         if results and all(getattr(r, "ok", False) for r in results):
@@ -99,9 +109,24 @@ class BrainCore(IBrainCore):
                 handled=True,
                 plan=plan,
                 artifacts={"results": [getattr(r, "output", None) for r in results]},
+                reflection=reflection,
             )
 
-        return BrainResult(request_id=request.request_id, handled=False)
+        return BrainResult(
+            request_id=request.request_id,
+            handled=False,
+            reflection=reflection,
+        )
+
+    def _reflect(self, request, plan, results, context) -> Optional[Reflection]:
+        """Produce a Reflection for a completed request; never raise. Read-only.
+        Returns None when no engine is injected or the engine fails."""
+        if self._reflection_engine is None:
+            return None
+        try:
+            return self._reflection_engine.reflect(request, plan, results, context)
+        except Exception:
+            return None
 
     async def _publish(self, topic: str, request: BrainRequest) -> None:
         """Best-effort event publish — never breaks the pipeline."""

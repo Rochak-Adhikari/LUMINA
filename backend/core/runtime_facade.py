@@ -183,6 +183,15 @@ class RuntimeFacade:
         from brain.workspace.sync import WorkspaceSync
         return self._container.resolve(WorkspaceSync)
 
+    @property
+    def reflection_engine(self) -> Any:
+        """Resolve the registered ReflectionEngine (Phase 5.7.3).
+
+        Dormant — a pure read-only post-execution evaluator; no runtime path
+        consumes it yet (BrainCore integration is a later milestone)."""
+        from brain.reflection.engine import ReflectionEngine
+        return self._container.resolve(ReflectionEngine)
+
     # ---- Adapters ------------------------------------------------------
 
     @property
