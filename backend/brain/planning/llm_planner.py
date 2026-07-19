@@ -28,6 +28,7 @@ from core.interfaces import IModelGateway
 from brain.core.interfaces import IPlanner
 from brain.core.models import BrainContext, Plan, Task
 from brain.skills.registry import SkillRegistry
+from brain.planning.prompt_builder import format_workspace_context
 
 _SYSTEM_INSTRUCTION = (
     "You are Lumina's planning engine. Convert the user request into a JSON "
@@ -84,7 +85,7 @@ class LLMPlanner(IPlanner):
         if not text or context.request.tool_call is not None:
             return None
 
-        prompt = self._build_prompt(text)
+        prompt = self._build_prompt(text, context.prompt_workspace)
         try:
             raw = self._generate_sync(prompt)
         except Exception:
@@ -105,7 +106,7 @@ class LLMPlanner(IPlanner):
         if not text or context.request.tool_call is not None:
             return None
 
-        prompt = self._build_prompt(text)
+        prompt = self._build_prompt(text, context.prompt_workspace)
         try:
             raw = await self._generate_async(prompt)
         except Exception:
@@ -125,9 +126,14 @@ class LLMPlanner(IPlanner):
             for s in self._registry.all()
         ]
 
-    def _build_prompt(self, text: str) -> str:
+    def _build_prompt(self, text: str, prompt_workspace: Optional[Any] = None) -> str:
         catalog = json.dumps(self._skill_catalog(), ensure_ascii=False)
-        return f"Skill catalog:\n{catalog}\n\nUser request:\n{text}"
+        workspace_section = format_workspace_context(prompt_workspace)
+        return (
+            f"Skill catalog:\n{catalog}\n"
+            f"{workspace_section}"
+            f"\nUser request:\n{text}"
+        )
 
     def _generate_sync(self, prompt: str) -> str:
         """

@@ -342,6 +342,7 @@ DEFAULT_SETTINGS = {
     "vad_post_roll_ms": 300,       # Post-roll buffer after silence detected
     "continuous_conversation": False,  # D.3.c: Continuous mode (experimental)
     "tool_permissions": {
+        "workspace_activation_enabled": False,  # Phase 5.8.2: dormant workspace activation
         # ========================================
         # ALL TOOLS DISABLED BY DEFAULT (Phase B.1)
         # ========================================

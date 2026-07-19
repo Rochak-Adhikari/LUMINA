@@ -192,6 +192,23 @@ class RuntimeFacade:
         from brain.reflection.engine import ReflectionEngine
         return self._container.resolve(ReflectionEngine)
 
+    # ---- Phase 5.8.2: Workspace Activation ------------------------------
+
+    def activate_workspace(self, project_manager: Any) -> Any:
+        """Runtime entry point for Workspace Activation (Phase 5.8.2).
+
+        Follows ProjectManager's active project into WorkspaceMemory by
+        delegating to the WorkspaceSync coordinator. This is the single
+        runtime abstraction for activation: callers invoke the facade, never
+        WorkspaceSync directly, leaving room for future activation logic
+        without touching call-sites.
+
+        Idempotent: activating the already-active workspace is a no-op
+        (WorkspaceSync short-circuits on unchanged path). Returns the current
+        WorkspaceMemory.
+        """
+        return self.workspace_sync.sync_to(project_manager)
+
     # ---- Adapters ------------------------------------------------------
 
     @property

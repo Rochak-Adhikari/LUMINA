@@ -18,6 +18,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from brain.workspace.models import WorkspaceRecallContext, PromptWorkspaceContext
+
 
 def _new_id() -> str:
     """Generate an opaque unique identifier."""
@@ -96,6 +98,16 @@ class BrainContext(BaseModel):
 
     request: BrainRequest
     workspace_ctx: Dict[str, Any] = Field(default_factory=dict)
+    workspace_recall: WorkspaceRecallContext = Field(
+        default_factory=WorkspaceRecallContext,
+        description="Prepared read-only workspace recall (Phase 5.9.7). "
+        "Always present; empty by default.",
+    )
+    prompt_workspace: PromptWorkspaceContext = Field(
+        default_factory=PromptWorkspaceContext,
+        description="Prompt-safe projection of workspace_recall (Phase 5.9.8). "
+        "The contract prompt builders read; hides all retrieval objects.",
+    )
     memories: List[Dict[str, Any]] = Field(default_factory=list)
     persona_state: Dict[str, Any] = Field(default_factory=dict)
     brain_snapshot: Dict[str, Any] = Field(

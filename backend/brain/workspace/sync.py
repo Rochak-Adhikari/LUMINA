@@ -48,6 +48,11 @@ class WorkspaceSync:
         """
         new_path = Path(project_manager.get_current_project_path())
 
+        # Idempotency: if the requested workspace is already active, do nothing
+        # (no re-switch, no re-load, no persistence). Deterministic no-op.
+        if self._current_path is not None and self._current_path == new_path:
+            return self._wsm.current()
+
         # 1. Save-before-switch (only if we already track a path and it differs).
         if self._current_path is not None and self._current_path != new_path:
             try:

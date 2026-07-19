@@ -61,6 +61,27 @@ The project is currently undergoing a major architectural refactor to make futur
 - Hybrid semantic search
 - Memory approval workflow
 
+### Workspace Reasoning
+
+Per-project structured memory with a read-only, deterministic recall layer that
+feeds planning and prompting:
+
+- Workspace Memory (structured per-project records)
+- Workspace Retrieval (deterministic, memory-only retriever)
+- Decision Recall
+- Notes Recall
+- Task Recall
+- Architecture Recall
+- WorkspaceRecallContext (frozen recall container)
+- PromptWorkspaceContext (frozen prompt-safe projection)
+- Prompt Builder (workspace prompt formatting)
+- Workspace-aware Planning
+- Workspace-aware Prompting
+
+Retrieval happens exactly once, in ContextBuilder — the sole enrichment point.
+Planners and prompt builders never retrieve. See
+`docs/truth/adr/ADR-0007-workspace-context-boundary.md`.
+
 ### Architecture
 
 - Dependency Injection

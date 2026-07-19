@@ -77,12 +77,30 @@ from brain.workspace.models import (
     Note,
     WorkspaceTask,
     WorkspaceSnapshot,
+    RetrievalHit,
+    WorkspaceRetrievalResult,
+    WorkspaceRecallContext,
+    PromptWorkspaceContext,
 )
-from brain.workspace.interfaces import IWorkspaceMemory
+from brain.workspace.interfaces import (
+    IWorkspaceMemory,
+    IWorkspaceRetriever,
+    IDecisionRecall,
+    INotesRecall,
+    ITaskRecall,
+    IArchitectureRecall,
+)
 from brain.workspace.memory import WorkspaceMemory
 from brain.workspace.store import WorkspaceMemoryStore
 from brain.workspace.manager import WorkspaceMemoryManager
 from brain.workspace.sync import WorkspaceSync
+from brain.workspace.retriever import WorkspaceRetriever
+from brain.workspace.recall import (
+    DecisionRecall,
+    NotesRecall,
+    TaskRecall,
+    ArchitectureRecall,
+)
 
 __all__ = [
     "ProjectInfo",
@@ -90,10 +108,24 @@ __all__ = [
     "Note",
     "WorkspaceTask",
     "WorkspaceSnapshot",
+    "RetrievalHit",
+    "WorkspaceRetrievalResult",
+    "WorkspaceRecallContext",
+    "PromptWorkspaceContext",
     "IWorkspaceMemory",
+    "IWorkspaceRetriever",
+    "IDecisionRecall",
+    "INotesRecall",
+    "ITaskRecall",
+    "IArchitectureRecall",
     "WorkspaceMemory",
     "WorkspaceMemoryStore",
     "WorkspaceMemoryManager",
     "WorkspaceSync",
+    "WorkspaceRetriever",
+    "DecisionRecall",
+    "NotesRecall",
+    "TaskRecall",
+    "ArchitectureRecall",
 ]
 

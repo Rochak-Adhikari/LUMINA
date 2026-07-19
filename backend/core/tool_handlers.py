@@ -62,6 +62,25 @@ async def handle_read_file(fc, loop) -> dict:
 
 # --- Project Management ---
 
+def _maybe_activate_workspace(loop) -> None:
+    """Phase 5.8.2 — flag-gated Workspace Activation trigger.
+
+    After ProjectManager switches project, follow it into WorkspaceMemory via
+    the RuntimeFacade (the single runtime abstraction; never WorkspaceSync
+    directly). Idempotent at the facade/sync layer. Disabled by default:
+    when off, this is a no-op and runtime behaviour is byte-identical.
+    Failure-safe — activation must never fail a project switch.
+    """
+    if not loop.permissions.get("workspace_activation_enabled", False):
+        return
+    facade = getattr(loop, "_facade", None)
+    if facade is None:
+        return
+    try:
+        facade.activate_workspace(loop.project_manager)
+    except Exception as e:
+        print(f"[LUMINA DEBUG] [WORKSPACE] Activation skipped (non-fatal): {e}")
+
 @ToolDispatcherRegistry.register("create_project")
 async def handle_create_project(fc, loop) -> dict:
     name = fc.args["name"]
@@ -69,6 +88,7 @@ async def handle_create_project(fc, loop) -> dict:
     success, msg = loop.project_manager.create_project(name)
     if success:
         loop.project_manager.switch_project(name)
+        _maybe_activate_workspace(loop)
         msg += f" Switched to '{name}'."
         if loop.on_project_update:
             loop.on_project_update(name)
@@ -80,6 +100,7 @@ async def handle_switch_project(fc, loop) -> dict:
     print(f"[LUMINA DEBUG] [TOOL] Tool Call: 'switch_project' name='{name}'")
     success, msg = loop.project_manager.switch_project(name)
     if success:
+        _maybe_activate_workspace(loop)
         if loop.on_project_update:
             loop.on_project_update(name)
         context = loop.project_manager.get_project_context()
