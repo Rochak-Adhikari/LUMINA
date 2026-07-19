@@ -19,6 +19,7 @@ from typing import Dict, List, Optional
 from brain.skills.models import SkillSpec
 from brain.skills.metadata import SkillMetadata
 from brain.skills.interfaces import ISkillRegistry
+from brain.skills.sources import DEFAULT_SOURCE
 
 
 class SkillRegistry(ISkillRegistry):
@@ -29,18 +30,22 @@ class SkillRegistry(ISkillRegistry):
         self._specs: Dict[str, SkillSpec] = {}
         self._metadata: Dict[str, SkillMetadata] = {}
 
-    def register(self, spec: SkillSpec) -> None:
+    def register(self, spec: SkillSpec, source: str = DEFAULT_SOURCE) -> None:
         """
         Register a SkillSpec. Duplicate ids raise — one owner per id.
 
-        Phase 5.5: also derives and stores a SkillMetadata for the spec. The
-        signature is unchanged; existing callers register exactly as before.
+        Phase 5.5: also derives and stores a SkillMetadata for the spec.
+
+        Phase 5.5 Step 5: *source* records the skill's origin (builtin/plugin/
+        mcp/generated/remote). Optional and defaults to "builtin", so existing
+        register(spec) calls are unchanged. The planner receives identical
+        SkillMetadata regardless of source.
         """
         with self._lock:
             if spec.id in self._specs:
                 raise ValueError(f"[SkillRegistry] Skill '{spec.id}' is already registered.")
             self._specs[spec.id] = spec
-            self._metadata[spec.id] = SkillMetadata.from_spec(spec)
+            self._metadata[spec.id] = SkillMetadata.from_spec(spec, source=source)
 
     def get(self, skill_id: str) -> Optional[SkillSpec]:
         """Return the SkillSpec for *skill_id*, or None."""
@@ -86,6 +91,7 @@ class SkillRegistry(ISkillRegistry):
         confirmation_required: Optional[bool] = None,
         inputs: Optional[List[str]] = None,
         outputs: Optional[List[str]] = None,
+        source: Optional[str] = None,
     ) -> List[SkillMetadata]:
         """
         Capability discovery over SkillMetadata (Phase 5.5 Step 2).
@@ -98,6 +104,7 @@ class SkillRegistry(ISkillRegistry):
           - inputs                 metadata.inputs contains ALL requested
           - outputs                metadata.outputs contains ALL requested
           - confirmation_required  exact bool match
+          - source                 exact match (Step 5). None => all sources.
         """
         want_tags = set(tags or [])
         want_inputs = set(inputs or [])
@@ -117,6 +124,8 @@ class SkillRegistry(ISkillRegistry):
                 continue
             if confirmation_required is not None and \
                     md.confirmation_required != confirmation_required:
+                continue
+            if source is not None and md.source != source:
                 continue
             results.append(md)
         return results

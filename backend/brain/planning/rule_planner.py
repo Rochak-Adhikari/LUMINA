@@ -88,18 +88,20 @@ class RulePlanner(IPlanner):
 
     def _resolve_nav_skill_id(self) -> str:
         """
-        Discover the navigation skill id via metadata (deterministic).
+        Discover the navigation skill id via deterministic capability ranking
+        (Phase 5.5 Step 4).
 
-        Queries the registry for the navigation capability and takes the first
-        match (registration-order preserving). Falls back to the hardcoded id
-        when no registry is injected or no capability matches — guaranteeing
-        zero runtime regression (Migration Strategy).
+        Delegates ALL ranking to CapabilityResolver — the planner holds no
+        ranking logic. Falls back to the hardcoded id when no registry is
+        injected or no capability is resolved, guaranteeing zero runtime
+        regression (Migration Strategy).
         """
         if self._registry is not None:
             try:
-                candidates = self._registry.search(category=_NAV_CATEGORY)
-                if candidates:
-                    return candidates[0].id  # deterministic first match
+                from brain.skills.resolver import CapabilityResolver
+                best = CapabilityResolver(self._registry).resolve(category=_NAV_CATEGORY)
+                if best is not None:
+                    return best.id  # deterministic highest-score winner
             except Exception:
                 pass
         return _NAV_FALLBACK_SKILL_ID

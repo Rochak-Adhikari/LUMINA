@@ -21,8 +21,8 @@ class ISkillRegistry(ABC):
     """Metadata storage and discovery contract for the skill layer."""
 
     @abstractmethod
-    def register(self, spec: SkillSpec) -> None:
-        """Register a SkillSpec. Duplicate ids raise."""
+    def register(self, spec: SkillSpec, source: str = "builtin") -> None:
+        """Register a SkillSpec with an optional origin source. Duplicate ids raise."""
 
     @abstractmethod
     def get(self, skill_id: str) -> Optional[SkillSpec]:
@@ -54,6 +54,8 @@ class ISkillRegistry(ABC):
         confirmation_required: Optional[bool] = None,
         inputs: Optional[List[str]] = None,
         outputs: Optional[List[str]] = None,
+        source: Optional[str] = None,
     ) -> List[SkillMetadata]:
         """Capability discovery over metadata (Phase 5.5 Step 2). Read-only,
-        deterministic, registration-order preserving; None filters ignored."""
+        deterministic, registration-order preserving; None filters ignored.
+        source filter added in Step 5 (None => all sources)."""

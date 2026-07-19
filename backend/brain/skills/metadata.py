@@ -42,11 +42,16 @@ class SkillMetadata:
     confirmation_required: bool = False
     version: str = "0.1.0"
     tags: Tuple[str, ...] = field(default_factory=tuple)
+    source: str = "builtin"
 
     @classmethod
-    def from_spec(cls, spec: "SkillSpec") -> "SkillMetadata":
+    def from_spec(cls, spec: "SkillSpec", source: str = "builtin") -> "SkillMetadata":
         """
         Derive metadata from a registered SkillSpec.
+
+        *source* records where the skill came from (builtin/plugin/mcp/
+        generated/remote). Descriptive only — the resolver may read it but
+        must not prefer any source.
 
         Field mapping (SkillSpec is authoritative):
           id                    <- spec.id
@@ -55,6 +60,7 @@ class SkillMetadata:
           category              <- first tag, else "general"
           permissions / tags    <- spec.permissions / spec.tags (as tuples)
           version               <- spec.version
+          source                <- source (default "builtin")
           inputs / outputs      <- empty (declared in a later phase)
           confirmation_required <- False (declared in a later phase)
         """
@@ -70,4 +76,5 @@ class SkillMetadata:
             confirmation_required=False,
             version=spec.version,
             tags=tags,
+            source=source,
         )
