@@ -166,6 +166,23 @@ class RuntimeFacade:
         from brain.skills.executors.legacy_tool_executor import LegacyToolExecutor
         return self._container.resolve(LegacyToolExecutor)
 
+    @property
+    def workspace_memory_manager(self) -> Any:
+        """Resolve the registered WorkspaceMemoryManager (Phase 5.6.4).
+
+        Dormant — no runtime path consumes it yet."""
+        from brain.workspace.manager import WorkspaceMemoryManager
+        return self._container.resolve(WorkspaceMemoryManager)
+
+    @property
+    def workspace_sync(self) -> Any:
+        """Resolve the registered WorkspaceSync coordinator (Phase 5.6.6).
+
+        Dormant — bridges ProjectManager → WorkspaceMemory but is not wired
+        into any runtime switch path yet."""
+        from brain.workspace.sync import WorkspaceSync
+        return self._container.resolve(WorkspaceSync)
+
     # ---- Adapters ------------------------------------------------------
 
     @property

@@ -99,9 +99,12 @@ class TestPhase5_1_Behavior(unittest.TestCase):
         self.assertIs(context.request, request)
         # BrainState is registered by Bootstrapper → snapshot extract present
         self.assertIsInstance(context.brain_snapshot, dict)
-        # Enrichment fields empty in 5.1
+        # Phase 5.6.5: ContextBuilder now enriches workspace_ctx from the
+        # injected WorkspaceMemoryManager (empty workspace → empty-record
+        # snapshot dict, not {}). Other enrichment fields still empty.
         self.assertEqual(context.memories, [])
-        self.assertEqual(context.workspace_ctx, {})
+        self.assertIsInstance(context.workspace_ctx, dict)
+        self.assertEqual(context.workspace_ctx.get("decisions"), [])
         self.assertEqual(context.persona_state, {})
         self.assertEqual(context.recent_history, [])
 

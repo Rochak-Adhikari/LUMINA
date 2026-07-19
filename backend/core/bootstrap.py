@@ -74,6 +74,9 @@ class Bootstrapper:
         self.legacy_executor: Optional[Any] = None
         self.llm_planner: Optional[Any] = None
         self.planner_chain: Optional[Any] = None
+        self.workspace_memory_store: Optional[Any] = None
+        self.workspace_memory_manager: Optional[Any] = None
+        self.workspace_sync: Optional[Any] = None
 
     def bootstrap(self) -> None:
         """Construct and register all services owned by this bootstrapper."""
@@ -87,6 +90,7 @@ class Bootstrapper:
         self._register_pipeline()
         self._register_adapters()
         self._register_planning_and_skills()
+        self._register_workspace_memory()
         self._register_brain_core()
         self._register_service_metadata()
 
@@ -223,7 +227,10 @@ class Bootstrapper:
         from brain.core.context_builder import ContextBuilder
         from brain.core.brain_core import BrainCore
 
-        self.context_builder = ContextBuilder(brain_state=self.brain_state)
+        self.context_builder = ContextBuilder(
+            brain_state=self.brain_state,
+            workspace_memory_manager=self.workspace_memory_manager,
+        )
         self._container.register_instance(IContextBuilder, self.context_builder)
         print("[DI] IContextBuilder -> ContextBuilder registered")
 
@@ -235,6 +242,38 @@ class Bootstrapper:
         )
         self._container.register_instance(IBrainCore, self.brain_core)
         print("[DI] IBrainCore -> BrainCore registered (planner+manager injected)")
+
+    def _register_workspace_memory(self) -> None:
+        """
+        Phase 5.6.4: Register the workspace-memory store and manager.
+
+        Dormant — no runtime path consumes them yet (ContextBuilder enrichment
+        and switch wiring are later milestones). The manager coordinates the
+        active WorkspaceMemory via the store; it holds no project files, no
+        ProjectManager logic, and no Brain/Planner coupling. Local imports keep
+        module import order flat (like MemoryStore/ProjectManager above).
+        """
+        from brain.workspace.store import WorkspaceMemoryStore
+        from brain.workspace.manager import WorkspaceMemoryManager
+        from brain.workspace.sync import WorkspaceSync
+
+        self.workspace_memory_store = WorkspaceMemoryStore()
+        self._container.register_instance(WorkspaceMemoryStore, self.workspace_memory_store)
+        print("[DI] WorkspaceMemoryStore registered")
+
+        self.workspace_memory_manager = WorkspaceMemoryManager(
+            store=self.workspace_memory_store
+        )
+        self._container.register_instance(
+            WorkspaceMemoryManager, self.workspace_memory_manager
+        )
+        print("[DI] WorkspaceMemoryManager registered (dormant)")
+
+        # Phase 5.6.6: WorkspaceSync bridges ProjectManager → WorkspaceMemory.
+        # Registered dormant — NOT wired into any runtime switch path yet.
+        self.workspace_sync = WorkspaceSync(self.workspace_memory_manager)
+        self._container.register_instance(WorkspaceSync, self.workspace_sync)
+        print("[DI] WorkspaceSync registered (dormant)")
 
     def _register_planning_and_skills(self) -> None:
         """
