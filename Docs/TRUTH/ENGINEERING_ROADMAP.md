@@ -1,8 +1,10 @@
-# LUMINA — OFFICIAL ROADMAP
+# LUMINA — ENGINEERING ROADMAP
 
-**SINGLE SOURCE OF TRUTH**
+**SINGLE SOURCE OF TRUTH (Engineering)**
 
-This document is the permanent, frozen roadmap for LUMINA development. From this point onward, every development session, architecture discussion, and implementation milestone must conform to this document. If any future discussion conflicts with this roadmap, this roadmap always wins.
+This document is the permanent, frozen engineering implementation roadmap for LUMINA development. From this point onward, every development session, architecture discussion, and implementation milestone must conform to this document. If any future discussion conflicts with this roadmap, this roadmap always wins.
+
+This is the engineering implementation roadmap. For long-term product vision, see `Docs/TRUTH/ROADMAP.md`.
 
 ---
 
@@ -12,7 +14,7 @@ LUMINA development has progressed through multiple architecture phases, beginnin
 
 Those historical implementation phases are **COMPLETE and ARCHIVED**. They are not reconstructed, renamed, or re-litigated here.
 
-The active public roadmap officially begins at **Phase 5.5**.
+The active engineering roadmap officially begins at **Phase 5.5**.
 
 ---
 
@@ -69,8 +71,8 @@ The active public roadmap officially begins at **Phase 5.5**.
 
 **Status: COMPLETE · VALIDATED · FROZEN**
 
-See `docs/truth/ARCHITECTURE.md` and
-`docs/truth/adr/ADR-0007-workspace-context-boundary.md`.
+See `Docs/TRUTH/ARCHITECTURE.md` and
+`Docs/TRUTH/adr/ADR-0007-workspace-context-boundary.md`.
 
 - Workspace Search
 - Decision Recall
@@ -125,7 +127,7 @@ See `docs/truth/ARCHITECTURE.md` and
 
 ## Roadmap Governance
 
-1. This document is the official roadmap.
+1. This document is the official engineering roadmap.
 2. Phase numbering is frozen.
 3. Existing phases may never be renamed.
 4. Existing phases may never be reordered.

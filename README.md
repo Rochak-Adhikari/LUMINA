@@ -80,7 +80,7 @@ feeds planning and prompting:
 
 Retrieval happens exactly once, in ContextBuilder — the sole enrichment point.
 Planners and prompt builders never retrieve. See
-`docs/truth/adr/ADR-0007-workspace-context-boundary.md`.
+`Docs/TRUTH/adr/ADR-0007-workspace-context-boundary.md`.
 
 ### Architecture
 

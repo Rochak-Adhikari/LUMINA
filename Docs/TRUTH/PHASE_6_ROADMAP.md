@@ -1,7 +1,7 @@
 # Phase 6.0 — Evolution Engine — Roadmap Blueprint
 
-Design-only blueprint for Phase 6.0 (per `docs/truth/ROADMAP.md`). No code.
-Decision reference: `docs/truth/adr/ADR-0008-evolution-engine.md`.
+Design-only blueprint for Phase 6.0 (per `Docs/TRUTH/ENGINEERING_ROADMAP.md`). No code.
+Decision reference: `Docs/TRUTH/adr/ADR-0008-evolution-engine.md`.
 
 The Evolution Engine observes, analyzes, and recommends. It NEVER rewrites the
 frozen runtime. Every milestone below ships DORMANT (no DI, no runtime consumer,

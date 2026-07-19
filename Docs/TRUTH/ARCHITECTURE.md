@@ -1,8 +1,8 @@
 # LUMINA — Architecture (Workspace Reasoning)
 
-Companion to `docs/truth/ROADMAP.md`. Documents the Phase 5.9 Workspace
+Companion to `Docs/TRUTH/ENGINEERING_ROADMAP.md`. Documents the Phase 5.9 Workspace
 Reasoning architecture. Decision reference:
-`docs/truth/adr/ADR-0007-workspace-context-boundary.md`.
+`Docs/TRUTH/adr/ADR-0007-workspace-context-boundary.md`.
 
 ## Workspace Reasoning Dependency Graph
 

@@ -1,8 +1,8 @@
 # ADR-0008 — Evolution Engine
 
 **Status:** Proposed (Phase 6.0 blueprint — design only, no implementation)
-**Related:** ADR-0007 (Workspace Context Boundary), `docs/truth/ROADMAP.md`
-(Phase 6.0 — Evolution Engine), `docs/truth/PHASE_6_ROADMAP.md`
+**Related:** ADR-0007 (Workspace Context Boundary), `Docs/TRUTH/ENGINEERING_ROADMAP.md`
+(Phase 6.0 — Evolution Engine), `Docs/TRUTH/PHASE_6_ROADMAP.md`
 
 ## Motivation
 

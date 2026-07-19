@@ -2,7 +2,7 @@
 
 **Status:** Accepted (Phase 5.9 freeze)
 **Supersedes:** —
-**Related:** docs/truth/ROADMAP.md (Phase 5.9 — Workspace Reasoning)
+**Related:** Docs/TRUTH/ENGINEERING_ROADMAP.md (Phase 5.9 — Workspace Reasoning)
 
 ## Purpose
 
