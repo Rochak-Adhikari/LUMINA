@@ -165,14 +165,13 @@ The new architecture is centered around several core systems:
 
 Documentation:
 
-- ARCHITECTURE.md
-- DEPENDENCY_GRAPH.md
-- EVENT_FLOW.md
-- RUNTIME_FLOW.md
-- SESSION_MANAGER.md
-- ROADMAP.md
-- PHASE_HISTORY.md
-- VISION.md
+- `Docs/04_Guides/FEATURE_GUIDE.md` — how every feature works
+- `Docs/TRUTH/ENGINEERING_ROADMAP.md` — authoritative engineering roadmap
+- `Docs/TRUTH/ROADMAP.md` — long-term product vision
+- `Docs/TRUTH/ARCHITECTURE.md` — architecture overview
+- `Docs/TRUTH/adr/` — architecture decision records (ADR-0007, ADR-0008)
+- `Docs/02_Development/PHASE_HISTORY.md` — completed phase history
+- `Docs/02_Development/CURRENT_STATUS.md` — current status
 
 ---
 
@@ -266,50 +265,50 @@ npm run electron
 
 # Current Architecture Progress
 
-## Phase 1
+## Phases 1–4 — Runtime Foundation
 
-- Runtime Foundation
-- Dependency Injection
-- Context System
-- Session Layer
-- Bootstrap System
+- Dependency Injection, Context System, Session Layer, Bootstrap
+- Brain State, Event System, Runtime Pipeline
+- Interface Extraction, Service Accessors, Runtime Facade
+- Stable Runtime Recovery (port scan, graceful shutdown, settings self-heal)
 
-Completed
-
----
-
-## Phase 2
-
-- Brain State
-- Event System
-- Memory Integration
-- Runtime Pipeline
-
-Completed
+Completed / Frozen
 
 ---
 
-## Phase 3
+## Phase 5 — Cognitive Architecture
 
-- Interface Extraction
-- Service Accessors
-- Runtime Facade
-- Validation Layer
+- BrainCore orchestrator + frozen value objects
+- Planning (RulePlanner / LLMPlanner / PlannerChain) + Skills
+- Capability Layer
+- Workspace Memory + Workspace Activation
+- Reflection Engine
+- Workspace Reasoning (retrieval → planning → prompting)
 
-Completed
+Completed / Frozen
+
+---
+
+## Phase 6 — Evolution Engine
+
+Analysis-only, fully dormant (never mutates runtime):
+
+- Reflection Learning, Strategy Improvement, Performance Analysis
+- Memory Consolidation, Self Evolution (Recommendation Engine)
+- Validation & Freeze
+
+Completed · Validated · Frozen
 
 ---
 
 # Roadmap
 
-- Plugin system
-- Multi-agent workflows
-- Mobile companion
-- Local LLM support
-- Advanced memory graph
-- Workflow automation
-- Vision improvements
-- Tool marketplace
+- Phase 7 — Skill Creator (consumes evolution recommendations behind approval)
+- Phase 8 — Autonomous Planning
+- Plugin system, multi-agent workflows, local LLM support, advanced memory graph
+
+See `Docs/04_Guides/FEATURE_GUIDE.md` for how every shipped feature works, and
+`Docs/TRUTH/ENGINEERING_ROADMAP.md` for the authoritative roadmap.
 
 ---
 

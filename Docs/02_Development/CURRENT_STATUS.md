@@ -6,55 +6,59 @@ This document defines the current release status, active development phase, and 
 
 ## 1. Release Metadata
 
-- **Current Version**: 2.2.0 (Interface-first decoupled core)
-- **Active Development Phase**: Post-Phase 4 (Stable Runtime Recovery completed)
-- **Architectural Status**: Core platform is FROZEN
+- **Current Version**: 2.6.0 (Cognitive Architecture + Evolution Engine)
+- **Active Development Phase**: Phase 6 complete; Phase 7 (Skill Creator) not started
+- **Architectural Status**: Runtime core FROZEN; Phase 5 & Phase 6 FROZEN
 - **Last Updated**: July 2026
 
 ---
 
 ## 2. Completed Phases
 
-All architectural foundational migrations are complete:
+Foundational runtime (Phases 1–4) and the Cognitive Architecture + Evolution
+Engine (Phases 5–6) are complete. See `Docs/02_Development/PHASE_HISTORY.md`
+for details and `Docs/04_Guides/FEATURE_GUIDE.md` for how every feature works.
 
-### Phase 1 — Runtime Foundation ✅
-- Thread-safe dependency injection container.
-- Transaction-managed Pydantic `BrainState` sandbox database.
-- Topic-wildcard `InProcessEventBus` for local pub/sub.
-- Sealed `RequestPipeline` execution middlewares.
-- Central `RuntimeFacade` access layer.
+### Phases 1–4 — Runtime Foundation ✅
+- DI container, `BrainState`, `InProcessEventBus`, `RequestPipeline`,
+  `RuntimeFacade`; state migrations; `SessionManager`/`ServiceAccessor`;
+  stable runtime recovery (port scan, graceful shutdown, settings self-heal).
 
-### Phase 2 — Brain Runtime & State Migrations ✅
-- State parameters (`pending_confirmation_id`) migrated to `BrainState`.
-- Converted client Socket disconnect handlers to publish on `EventBus`.
-- Wrapped `create_quest` parameters in structured `ExecutionContext` schemas.
-- Decoupled `get_memories`, `generate_cad`, and `list_projects` to resolve via containerized interfaces (`IMemoryManager` and `IWorkspaceManager`).
+### Phase 5 — Cognitive Architecture ✅ (FROZEN)
+- **5.1** BrainCore orchestrator + frozen value objects.
+- **5.2–5.3** RulePlanner, LLMPlanner, PlannerChain, SkillManager/Registry.
+- **5.5** Capability Layer (skill metadata, capability discovery).
+- **5.6** Workspace Memory (memory/store/manager/sync + ContextBuilder read).
+- **5.7** Reflection Engine (deterministic, read-only, attached by BrainCore).
+- **5.8** Workspace Activation (`RuntimeFacade.activate_workspace`, idempotent,
+  flag-gated).
+- **5.9** Workspace Reasoning: WorkspaceRetriever; Decision/Notes/Task/
+  Architecture recall; workspace-aware planning; workspace-aware prompting;
+  project context injection (ADR-0007 boundary).
 
-### Phase 3 — Complete Architectural Migration ✅
-- Introduced `SessionManager` to govern `AudioLoop` lifecycle variables.
-- Introduced `ServiceAccessor` lookup bridge.
-- Decoupled `server.py` from direct `AudioLoop` fields.
-- Synchronized turn events with `BrainState.record_user_turn`.
-
-### Phase 4 — Stable Runtime Recovery ✅
-- **Milestone 4.1**: FastAPI dynamic port recovery scanner (checks port 8000 occupancy) and graceful shutdown publisher dispatch.
-- **Milestone 4.2**: Instantiation inversion in `AudioLoop` (resolves database and workspace manager via facade).
-- **Milestone 4.3**: Pydantic-based `SettingsSchema` configuration validator and self-healing.
-- **Milestone 4.4**: Remote control paired dashboard command queues and phone stream audio chunks routed over EventBus.
-- **Milestone 4.5**: Thread safety verification under concurrent stress, starvation, and heavily corrupted settings parameters.
-- **Milestone 4.6**: Eliminated `_get_memory_store` legacy bypass path (all call-sites resolved via `_svc.memory_store`) and added `/debug/events` diagnostic endpoint.
+### Phase 6 — Evolution Engine ✅ (VALIDATED · FROZEN)
+Analysis-only, fully dormant (ADR-0008). Observe → aggregate → measure →
+consolidate → recommend:
+- **6.1** EvolutionObserver + EvolutionObservation + append-only EvolutionStore.
+- **6.2** StrategyEvaluator → StrategyAnalysis.
+- **6.3** PerformanceAnalyzer → PerformanceAnalysis.
+- **6.4** MemoryConsolidator → ConsolidationProposalSet (read-only proposals).
+- **6.5** RecommendationEngine → EvolutionRecommendationSet.
+- **6.6** Validation & Freeze.
 
 ---
 
 ## 3. Current & Next Phases
 
-### Current Phase: Stable Maintenance
-The system core is architecturally stable and frozen. All regression tests in `backend/brain/` pass cleanly.
+### Current: Phase 6 frozen
+Runtime core stable and frozen. Evolution Engine registered but dormant —
+runtime behavior byte-identical to Phase 5. Full Phase 5 + Phase 6 regression
+passing (480 tests).
 
-### Next Phase: Phase 5 — Memory Engine (Planned)
-- Implement SQLite `FTS5` full-text search.
-- Integrate FAISS semantic vector search for concept matching.
-- Implement access priority decay algorithms.
+### Next: Phase 7 — Skill Creator (Planned)
+Consumes `EvolutionRecommendationSet` (from Phase 6) behind human approval to
+perform dynamic skill generation, validation, packaging, installation, and
+registry updates. Will not modify any Phase 6 code.
 
 ---
 

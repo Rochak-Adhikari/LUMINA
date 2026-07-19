@@ -4,6 +4,41 @@ All notable changes to the Lumina V2 platform are documented in this file.
 
 ---
 
+## [2.6.0] — 2026-07 (Phase 6 — Evolution Engine, frozen)
+
+### Added
+- **Evolution Engine (`brain/evolution/`)** — analysis-only, fully dormant (ADR-0008).
+  Registered in DI but consumed by no runtime path; runtime byte-identical.
+  - **6.1** `EvolutionObserver` + `EvolutionObservation` + append-only `EvolutionStore`.
+  - **6.2** `StrategyEvaluator` → `StrategyAnalysis`.
+  - **6.3** `PerformanceAnalyzer` → `PerformanceAnalysis`.
+  - **6.4** `MemoryConsolidator` → `ConsolidationProposalSet` (read-only proposals).
+  - **6.5** `RecommendationEngine` → `EvolutionRecommendationSet`.
+  - **6.6** Validation & Freeze.
+- **ADR-0008** — Evolution Engine boundary (analysis layer, never mutates runtime).
+
+### Notes
+- All evolution models frozen + serializable; ids deterministic (no UUID/time/random).
+- Full Phase 5 + Phase 6 regression: 480 passing.
+
+---
+
+## [2.5.0] — 2026-07 (Phase 5 — Cognitive Architecture, frozen)
+
+### Added
+- **BrainCore** orchestrator + frozen value objects (5.1).
+- **Planning & Skills** — RulePlanner, LLMPlanner, PlannerChain, SkillManager (5.2–5.3).
+- **Capability Layer** — skill metadata + capability discovery (5.5).
+- **Workspace Memory** — memory/store/manager/sync + ContextBuilder read (5.6).
+- **Reflection Engine** — deterministic, read-only, attached by BrainCore (5.7).
+- **Workspace Activation** — `RuntimeFacade.activate_workspace`, idempotent, flag-gated (5.8).
+- **Workspace Reasoning** — WorkspaceRetriever; Decision/Notes/Task/Architecture
+  recall; workspace-aware planning + prompting; project context injection (5.9).
+- **ADR-0007** — Workspace context boundary (`PromptWorkspaceContext` is the only
+  object crossing into prompt generation).
+
+---
+
 ## [2.2.0] — 2026-07 (Phase 4 final)
 
 ### Added

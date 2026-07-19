@@ -83,3 +83,50 @@ timeline
   - `test_phase_4_1.py` (2/2 PASS)
   - `test_phase_4_5.py` (3/3 PASS)
   - `test_phase_4_6.py` (7/7 PASS)
+
+### Phase 5 — Cognitive Architecture (FROZEN)
+- **Goal**: Add a decoupled "Brain" cognitive layer around the frozen runtime —
+  orchestration, planning, skills, workspace memory, reflection, and read-only
+  workspace reasoning — without changing runtime behavior.
+- **Milestones**:
+  - **5.1** `BrainCore` orchestrator + frozen value objects (`BrainRequest`,
+    `BrainContext`, `Plan`, `Task`, `BrainResult`, `Reflection`).
+  - **5.2–5.3** `RulePlanner`, `LLMPlanner` (inert until a gateway binds),
+    `PlannerChain`, `SkillManager`/`SkillRegistry`.
+  - **5.5** Capability Layer — skill metadata, capability discovery,
+    metadata-driven planning (`CapabilityResolver`).
+  - **5.6** Workspace Memory — `WorkspaceMemory`, `WorkspaceMemoryStore`,
+    `WorkspaceMemoryManager`, `WorkspaceSync`; `ContextBuilder` reads snapshot.
+  - **5.7** Reflection Engine — deterministic, read-only; attached by BrainCore.
+  - **5.8** Workspace Activation — `RuntimeFacade.activate_workspace`, idempotent,
+    flag-gated (default off → byte-identical runtime).
+  - **5.9** Workspace Reasoning — `WorkspaceRetriever`;
+    Decision/Notes/Task/Architecture recall; workspace-aware planning
+    (`WorkspaceRecallContext`); workspace-aware prompting
+    (`PromptWorkspaceContext`); project context injection (`prompt_builder.py`).
+    Boundary defined in ADR-0007.
+- **Files**: `backend/brain/core/*`, `backend/brain/planning/*`,
+  `backend/brain/skills/*`, `backend/brain/workspace/*`,
+  `backend/brain/reflection/*`, `backend/core/runtime_facade.py`,
+  `backend/core/bootstrap.py`.
+- **Verification**: `test_phase_5*.py` (404 PASS). Status: COMPLETE · FROZEN.
+
+### Phase 6 — Evolution Engine (VALIDATED · FROZEN)
+- **Goal**: Add an analysis-only Evolution Engine that observes the runtime and
+  produces immutable recommendations — never mutating runtime (ADR-0008). Every
+  component is dormant (registered in DI, consumed by no runtime path).
+- **Milestones**:
+  - **6.1** Reflection Learning — `EvolutionObserver`, `EvolutionObservation`,
+    append-only `EvolutionStore`.
+  - **6.2** Strategy Improvement — `StrategyEvaluator` → `StrategyAnalysis`.
+  - **6.3** Performance Analysis — `PerformanceAnalyzer` → `PerformanceAnalysis`.
+  - **6.4** Memory Consolidation — `MemoryConsolidator` →
+    `ConsolidationProposalSet` (read-only proposals; never writes memory).
+  - **6.5** Self Evolution — `RecommendationEngine` (PerformanceAnalysis +
+    ConsolidationProposalSet) → `EvolutionRecommendationSet`.
+  - **6.6** Validation & Freeze.
+- **Files**: `backend/brain/evolution/*`, `backend/core/bootstrap.py`.
+- **Verification**: `test_phase_6_step1..5.py` (76 PASS); full Phase 5+6
+  regression 480 PASS. Status: COMPLETE · VALIDATED · FROZEN.
+
+See `Docs/04_Guides/FEATURE_GUIDE.md` for how each subsystem works.
