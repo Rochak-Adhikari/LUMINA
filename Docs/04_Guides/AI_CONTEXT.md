@@ -18,7 +18,7 @@ Lumina is a private conversational AI companion designed for voice-first interac
 
 ## 2. Current Architecture & Status
 
-Lumina is currently in **Version 2.2.0**. The core architectural components are completely **frozen** and stable.
+Lumina is currently in **Version 2.7.0**. The core architectural components are completely **frozen** and stable. Phases 5 (Cognitive Architecture), 6 (Evolution Engine), and 7 (Skill Creator) are COMPLETE and FROZEN; Phase 8 (Skill Runtime) is next.
 
 The infrastructure consists of:
 1. **Dependency Injection Container** (`backend/core/container.py`): Lazy singleton registrations of core service contracts.
@@ -33,7 +33,7 @@ The infrastructure consists of:
 
 ### 🚫 Things AI Assistants Must NEVER Do
 
-1. **Never implement future roadmap items**: Do not write code for Phase 5 (FAISS/FTS5 memories) or Phase 6 (autonomous plan graphs) unless explicitly requested.
+1. **Never implement future roadmap items**: Do not write code for Phase 8 (Skill Runtime) or later roadmap items unless explicitly requested. Phases 5–7 are complete and frozen — consume them, do not redesign.
 2. **Never create placeholder code**: Writing `pass`, `NotImplementedError`, or Mock classes inside production modules is strictly prohibited. Everything implemented must be production-ready.
 3. **Never redesign working architecture**: Do not rewrite the DI container, do not bypass the ServiceAccessor, do not replace the Pydantic state model, and do not introduce new frameworks.
 4. **Never claim tests pass without running them**: You must actively run the test scripts via the terminal and verify the output before claiming a task is done.

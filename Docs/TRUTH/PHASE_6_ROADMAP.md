@@ -1,11 +1,14 @@
 # Phase 6.0 — Evolution Engine — Roadmap Blueprint
 
-Design-only blueprint for Phase 6.0 (per `Docs/TRUTH/ENGINEERING_ROADMAP.md`). No code.
+**Status: COMPLETE · VALIDATED · FROZEN** — implemented in `backend/brain/evolution/`
+(all components dormant in DI). This document was the design blueprint; the
+described architecture is now built and frozen exactly as specified.
+
 Decision reference: `Docs/TRUTH/adr/ADR-0008-evolution-engine.md`.
 
 The Evolution Engine observes, analyzes, and recommends. It NEVER rewrites the
-frozen runtime. Every milestone below ships DORMANT (no DI, no runtime consumer,
-runtime byte-identical) until an explicit post-6.6 activation.
+frozen runtime. Every milestone ships DORMANT (registered in DI, no runtime
+consumer, runtime byte-identical) until an explicit post-6.6 activation.
 
 **This phase builds the intelligence required for future self-evolution. It does
 not perform evolution.** Phase 6 decides WHAT should evolve and emits immutable

@@ -6,18 +6,19 @@ This document defines the current release status, active development phase, and 
 
 ## 1. Release Metadata
 
-- **Current Version**: 2.6.0 (Cognitive Architecture + Evolution Engine)
-- **Active Development Phase**: Phase 6 complete; Phase 7 (Skill Creator) not started
-- **Architectural Status**: Runtime core FROZEN; Phase 5 & Phase 6 FROZEN
+- **Current Version**: 2.7.0 (Cognitive Architecture + Evolution Engine + Skill Creator)
+- **Active Development Phase**: Phase 7 complete; Phase 8 (Skill Runtime) not started
+- **Architectural Status**: Runtime core FROZEN; Phase 5, 6 & 7 FROZEN
 - **Last Updated**: July 2026
 
 ---
 
 ## 2. Completed Phases
 
-Foundational runtime (Phases 1–4) and the Cognitive Architecture + Evolution
-Engine (Phases 5–6) are complete. See `Docs/02_Development/PHASE_HISTORY.md`
-for details and `Docs/04_Guides/FEATURE_GUIDE.md` for how every feature works.
+Foundational runtime (Phases 1–4), the Cognitive Architecture (Phase 5),
+Evolution Engine (Phase 6), and Skill Creator (Phase 7) are complete. See
+`Docs/02_Development/PHASE_HISTORY.md` for details and
+`Docs/04_Guides/FEATURE_GUIDE.md` for how every feature works.
 
 ### Phases 1–4 — Runtime Foundation ✅
 - DI container, `BrainState`, `InProcessEventBus`, `RequestPipeline`,
@@ -46,19 +47,28 @@ consolidate → recommend:
 - **6.5** RecommendationEngine → EvolutionRecommendationSet.
 - **6.6** Validation & Freeze.
 
+### Phase 7 — Skill Creator ✅ (VALIDATED · FROZEN)
+Deterministic 10-stage compiler pipeline in `backend/brain/skill_creator/`; each
+stage a dormant DI-registered class producing one frozen artifact. See
+`Docs/TRUTH/pipeline/01–10` + ADR-0009–0013.
+- **7.1** Foundation (contracts) · **7.2** Blueprint Builder (+7.2.5/7.2.6/7.2.7 schema harden/freeze/spec)
+- **7.3** Verification · **7.4** Generation · **7.5** Testing
+- **7.6** Approval (human gate) · **7.7** Installation · **7.8** Registry (append-only)
+- **7.9** Lifecycle (append-only) · **7.10** Marketplace · **7.11** Rollback
+
 ---
 
 ## 3. Current & Next Phases
 
-### Current: Phase 6 frozen
-Runtime core stable and frozen. Evolution Engine registered but dormant —
-runtime behavior byte-identical to Phase 5. Full Phase 5 + Phase 6 regression
-passing (480 tests).
+### Current: Phase 7 frozen
+Runtime core stable and frozen. Skill Creator pipeline registered but dormant —
+no runtime path consumes it; runtime behavior byte-identical to Phase 5. Full
+Phase 5 + 6 + 7 regression passing (**694 tests**; 214 Phase 7).
 
-### Next: Phase 7 — Skill Creator (Planned)
-Consumes `EvolutionRecommendationSet` (from Phase 6) behind human approval to
-perform dynamic skill generation, validation, packaging, installation, and
-registry updates. Will not modify any Phase 6 code.
+### Next: Phase 8 — Skill Runtime (Planned)
+The runtime that USES skills created by the pipeline — consumes `RegistryEntry`
+and runtime requests to discover, validate, sandbox, load, and execute installed
+skills. Will not modify the frozen Skill Creator pipeline.
 
 ---
 

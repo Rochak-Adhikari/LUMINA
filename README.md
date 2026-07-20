@@ -301,10 +301,24 @@ Completed · Validated · Frozen
 
 ---
 
+## Phase 7 — Skill Creator
+
+Deterministic 10-stage compiler pipeline (all stages dormant in DI):
+
+- Builder → Verifier → Generator → Tester → Approver (human gate)
+- Installer → Registry → Lifecycle → Marketplace → Rollback
+
+Turns an approved evolution recommendation into an installed, registered skill;
+each stage produces one frozen immutable artifact. See `Docs/TRUTH/pipeline/*`
+and ADR-0009–0013.
+
+Completed · Validated · Frozen
+
+---
+
 # Roadmap
 
-- Phase 7 — Skill Creator (consumes evolution recommendations behind approval)
-- Phase 8 — Autonomous Planning
+- Phase 8 — Skill Runtime (consume RegistryEntry to use created skills) / Autonomous Planning
 - Plugin system, multi-agent workflows, local LLM support, advanced memory graph
 
 See `Docs/04_Guides/FEATURE_GUIDE.md` for how every shipped feature works, and

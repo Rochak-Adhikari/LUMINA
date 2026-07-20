@@ -25,17 +25,14 @@ conda info --envs | grep "*"
 
 Lumina includes comprehensive integration tests in `backend/brain/` to verify DI container mappings, EventBus wildcards, configuration healing, and legacy paths.
 
-All tests should be run in the active `lumina` environment from the repository root:
+All tests should be run in the active `lumina` environment from the repository root. Phase test suites live under `backend/tests/`:
 
 ```bash
-# Run Milestone 4.1 tests (Port Scan / Shutdown)
-E:\AI\conda_envs\lumina\python.exe backend/brain/test_phase_4_1.py
+# Run a specific phase suite (example: Phase 7 Skill Creator)
+E:\AI\conda_envs\lumina\python.exe -m pytest backend/tests/test_phase_7_step1.py
 
-# Run Milestone 4.5 tests (Concurrencies / Settings healing)
-E:\AI\conda_envs\lumina\python.exe backend/brain/test_phase_4_5.py
-
-# Run Milestone 4.6 tests (Legacy _get_memory_store validation)
-E:\AI\conda_envs\lumina\python.exe backend/brain/test_phase_4_6.py
+# Run the full Phase 5 + 6 + 7 regression (694 tests)
+E:\AI\conda_envs\lumina\python.exe -m pytest backend/tests/test_phase_5*.py backend/tests/test_phase_6*.py backend/tests/test_phase_7*.py
 ```
 
 ---

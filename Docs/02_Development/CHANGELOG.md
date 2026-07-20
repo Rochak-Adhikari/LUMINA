@@ -4,6 +4,26 @@ All notable changes to the Lumina V2 platform are documented in this file.
 
 ---
 
+## [2.7.0] — 2026-07 (Phase 7 — Skill Creator, frozen)
+
+### Added
+- **Skill Creator (`brain/skill_creator/`)** — deterministic 10-stage compiler
+  pipeline, all stages dormant in DI, one frozen artifact each (ADR-0009–0013).
+  - Builder → Verifier → Generator → Tester → Approver (human gate) → Installer
+    → Registry (append-only) → Lifecycle (append-only) → Marketplace → Rollback.
+  - Artifacts: SkillBlueprint(Set), VerificationResult, GenerationResult,
+    TestResult, ApprovalRecord, InstallationRecord, RegistryEntry, LifecycleEvent,
+    MarketplaceManifest, RollbackRecord.
+- Pipeline docs `Docs/TRUTH/pipeline/01–10`; ADR-0009 (pipeline), ADR-0010
+  (compiler-pipeline law), ADR-0011 (blueprint schema frozen), ADR-0012 (artifact
+  immutability), ADR-0013 (SkillArtifactBundle reservation).
+
+### Notes
+- No runtime consumer yet (Phase 8, Skill Runtime). Runtime byte-identical.
+- Full regression: **694 passing** (214 Phase 7).
+
+---
+
 ## [2.6.0] — 2026-07 (Phase 6 — Evolution Engine, frozen)
 
 ### Added

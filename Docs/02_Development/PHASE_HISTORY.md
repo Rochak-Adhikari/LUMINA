@@ -129,4 +129,27 @@ timeline
 - **Verification**: `test_phase_6_step1..5.py` (76 PASS); full Phase 5+6
   regression 480 PASS. Status: COMPLETE · VALIDATED · FROZEN.
 
+### Phase 7 — Skill Creator (VALIDATED · FROZEN)
+- **Goal**: Perform the approved evolution — turn an `EvolutionRecommendationSet`
+  into an installed, registered skill via a deterministic 10-stage compiler
+  pipeline. Each stage a dormant DI-registered class producing one frozen
+  immutable artifact; no stage mutates a prior artifact (append-only provenance).
+- **Milestones / stages**:
+  - **7.1** Foundation — `ISkillCreator`, `SkillBlueprint`.
+  - **7.2** Blueprint Builder → `SkillBlueprintSet` (+7.2.5/7.2.6/7.2.7 schema
+    harden / freeze / pipeline-spec).
+  - **7.3** Verification — `BlueprintVerifier` → `VerificationResult`.
+  - **7.4** Generation — `BlueprintGenerator` → `GenerationResult`.
+  - **7.5** Testing — `BlueprintTester` → `TestResult`.
+  - **7.6** Approval — `BlueprintApprover` → `ApprovalRecord` (human gate).
+  - **7.7** Installation — `BlueprintInstaller` → `InstallationRecord`.
+  - **7.8** Registry — `BlueprintRegistry` → `RegistryEntry` (append-only).
+  - **7.9** Lifecycle — `LifecycleManager` → `LifecycleEvent` (append-only).
+  - **7.10** Marketplace — `MarketplacePublisher` → `MarketplaceManifest`.
+  - **7.11** Rollback — `RollbackManager` → `RollbackRecord`.
+- **Files**: `backend/brain/skill_creator/*`, `backend/core/bootstrap.py`;
+  `Docs/TRUTH/pipeline/01–10`, ADR-0009–0013.
+- **Verification**: `test_phase_7_step1..11` (+step2_5/2_6) — 214 PASS; full
+  Phase 5+6+7 regression **694 PASS**. Status: COMPLETE · VALIDATED · FROZEN.
+
 See `Docs/04_Guides/FEATURE_GUIDE.md` for how each subsystem works.

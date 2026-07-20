@@ -1,4 +1,13 @@
-# Lumina - Official Long-Term Roadmap
+# Lumina - Official Long-Term Roadmap (Product Vision)
+
+> **Scope note.** This document is the long-term **product vision** and uses a
+> thematic, aspirational phase numbering that is INDEPENDENT of engineering
+> execution. It is NOT the authoritative implementation roadmap. For the
+> authoritative, execution-accurate engineering roadmap and current phase status
+> (Phase 5 Cognitive Architecture, Phase 6 Evolution Engine, Phase 7 Skill
+> Creator — all COMPLETE·FROZEN; Phase 8 Autonomous Planning next), see
+> `Docs/TRUTH/ENGINEERING_ROADMAP.md`. Where the two disagree on phase numbers,
+> the Engineering Roadmap governs implementation and the code is the final truth.
 
 This document outlines the strategic vision, architectural principles, and progression milestones for Lumina. It defines Lumina's transition from a stable foundation into a local-first, learning-enabled AI operating system.
 

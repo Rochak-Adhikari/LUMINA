@@ -49,7 +49,7 @@ generation. Prompt builders MUST NEVER receive `WorkspaceMemory`,
 `WorkspaceMemoryManager` / Store, Recall services, `WorkspaceRecallContext`,
 `WorkspaceSync` / Activation, or any runtime/mutable object. See ADR-0007.
 
-## Evolution Engine Dependency Graph (Phase 6 — planned)
+## Evolution Engine Dependency Graph (Phase 6 — COMPLETE · FROZEN)
 
 The Evolution Engine is an analysis layer. It observes and recommends; it never
 mutates runtime. Recommendations flow forward to Phase 7 (Skill Creator), which
@@ -75,6 +75,36 @@ The Evolution Engine NEVER flows into runtime mutation. There is no
 `Evolution Engine → runtime mutation` edge. The only path from recommendations
 to runtime is through Phase 7, behind human approval.
 
+## Skill Creator Pipeline (Phase 7 — COMPLETE · FROZEN)
+
+A deterministic 10-stage compiler pipeline (ADR-0010) that turns an approved
+evolution recommendation into an installed, registered skill. Each stage is a
+small dormant DI-registered class producing exactly one frozen immutable
+artifact; no stage mutates a prior artifact (ADR-0012, append-only provenance).
+Implemented in `backend/brain/skill_creator/`. Per-stage detail:
+`Docs/TRUTH/pipeline/01–10`; decisions: ADR-0009–0013.
+
+```
+EvolutionRecommendationSet
+   → 01 Builder      → SkillBlueprintSet
+   → 02 Verifier     → VerificationResult
+   → 03 Generator    → GenerationResult
+   → 04 Tester       → TestResult
+   → 05 Approver     → ApprovalRecord      (mandatory human gate)
+   → 06 Installer    → InstallationRecord  (first filesystem write)
+   → 07 Registry     → RegistryEntry       (append-only)
+   → 08 Lifecycle    → LifecycleEvent[]    (append-only)
+   → 09 Marketplace  → MarketplaceManifest (descriptive; no networking)
+   → 10 Rollback     → RollbackRecord      (reverses installation)
+```
+
+Invariants: deterministic (same input → byte-identical output; no
+UUID/timestamp/random), each stage gated on the prior artifact, all stages
+dormant in DI (no runtime consumer yet — that is Phase 8, the Skill Runtime).
+
 ## Status
 
-Phase 5.9 — Workspace Reasoning: **COMPLETE · VALIDATED · FROZEN**.
+- Phase 5.9 — Workspace Reasoning: **COMPLETE · VALIDATED · FROZEN**.
+- Phase 6 — Evolution Engine: **COMPLETE · VALIDATED · FROZEN**.
+- Phase 7 — Skill Creator: **COMPLETE · VALIDATED · FROZEN**.
+- Phase 8 — Skill Runtime: **NOT STARTED**.

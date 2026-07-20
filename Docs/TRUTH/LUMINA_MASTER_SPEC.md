@@ -1,3 +1,11 @@
+> **Sync note (2026-07).** This master spec is the long-form design/vision
+> document; its embedded roadmap uses an older thematic phase numbering. For
+> authoritative, execution-accurate phase status see
+> `Docs/TRUTH/ENGINEERING_ROADMAP.md`: Phases 5 (Cognitive Architecture), 6
+> (Evolution Engine), and 7 (Skill Creator) are COMPLETE·FROZEN; Phase 8 (Skill
+> Runtime) is next. Where this spec's roadmap numbering disagrees, the
+> Engineering Roadmap governs and the code is the final truth.
+
 [Part 1 --- Vision & Philosophy [1](#part-1-vision-philosophy)](#part-1-vision-philosophy)
 
 [Lumina [1](#lumina)](#lumina)

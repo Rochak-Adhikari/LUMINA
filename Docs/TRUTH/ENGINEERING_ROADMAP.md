@@ -88,7 +88,7 @@ See `Docs/TRUTH/ARCHITECTURE.md` and
 
 ### Phase 6.0 — Evolution Engine
 
-**Status: NOT STARTED**
+**Status: COMPLETE · VALIDATED · FROZEN**
 
 The Evolution Engine observes and recommends. It never mutates runtime. It
 observes execution, measures performance, analyzes outcomes, evaluates
@@ -98,28 +98,40 @@ changes runtime behavior. Phase 6 is the FOUNDATION for future evolution: it
 decides WHAT should evolve. Phase 7 (Skill Creator) consumes Phase 6
 recommendations and performs the approved evolution.
 
-- Reflection Learning
-- Strategy Improvement
-- Performance Analysis
-- Memory Consolidation
-- Self Evolution
+Implemented in `backend/brain/evolution/` (all components dormant in DI):
+
+- Reflection Learning — EvolutionObserver, EvolutionObservation, EvolutionStore
+- Strategy Improvement — StrategyEvaluator → StrategyAnalysis
+- Performance Analysis — PerformanceAnalyzer → PerformanceAnalysis
+- Memory Consolidation — MemoryConsolidator → ConsolidationProposalSet
+- Self Evolution — RecommendationEngine → EvolutionRecommendationSet
 - Validation & Freeze
 
 ---
 
 ### Phase 7.0 — Skill Creator
 
-**Status: NOT STARTED**
+**Status: COMPLETE · VALIDATED · FROZEN**
 
 Phase 7 consumes Phase 6 recommendations and performs the approved evolution.
 Phase 6 decides WHAT should evolve; Phase 7 performs it. This separation is
 permanent.
 
-- Dynamic Skill Generation
-- Skill Validation
-- Skill Packaging
-- Skill Installation
-- Skill Registry Updates
+Implemented as a deterministic 10-stage compiler pipeline in
+`backend/brain/skill_creator/` (all stages dormant in DI, one frozen artifact
+each). See `Docs/TRUTH/pipeline/01–10` and ADR-0009–0013.
+
+- 7.1 Foundation — contracts (ISkillCreator, SkillBlueprint)
+- 7.2 Blueprint Builder → SkillBlueprintSet (+7.2.5/7.2.6/7.2.7 schema harden/freeze/spec)
+- 7.3 Verification — BlueprintVerifier → VerificationResult
+- 7.4 Generation — BlueprintGenerator → GenerationResult
+- 7.5 Testing — BlueprintTester → TestResult
+- 7.6 Approval — BlueprintApprover → ApprovalRecord (mandatory human gate)
+- 7.7 Installation — BlueprintInstaller → InstallationRecord
+- 7.8 Registry — BlueprintRegistry → RegistryEntry (append-only)
+- 7.9 Lifecycle — LifecycleManager → LifecycleEvent (append-only)
+- 7.10 Marketplace — MarketplacePublisher → MarketplaceManifest
+- 7.11 Rollback — RollbackManager → RollbackRecord
 - Validation & Freeze
 
 ---

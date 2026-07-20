@@ -2,6 +2,44 @@
 
 All notable changes to LUMINA are documented here.
 
+## Phase 7 — Skill Creator
+
+**Status: COMPLETE · VALIDATED · FROZEN**
+
+Deterministic 10-stage compiler pipeline in `backend/brain/skill_creator/`; each
+stage a dormant DI-registered class producing one frozen immutable artifact. No
+runtime consumer yet (that is Phase 8). Runtime byte-identical.
+
+- 7.1 Foundation — `ISkillCreator`, `SkillBlueprint` (+7.2.5/7.2.6/7.2.7 schema harden/freeze/spec)
+- 7.2 Blueprint Builder → `SkillBlueprintSet`
+- 7.3 Verification — `BlueprintVerifier` → `VerificationResult`
+- 7.4 Generation — `BlueprintGenerator` → `GenerationResult`
+- 7.5 Testing — `BlueprintTester` → `TestResult`
+- 7.6 Approval — `BlueprintApprover` → `ApprovalRecord` (mandatory human gate)
+- 7.7 Installation — `BlueprintInstaller` → `InstallationRecord`
+- 7.8 Registry — `BlueprintRegistry` → `RegistryEntry` (append-only)
+- 7.9 Lifecycle — `LifecycleManager` → `LifecycleEvent` (append-only)
+- 7.10 Marketplace — `MarketplacePublisher` → `MarketplaceManifest`
+- 7.11 Rollback — `RollbackManager` → `RollbackRecord`
+- ADRs added: ADR-0009 (pipeline), ADR-0010 (compiler pipeline law), ADR-0011
+  (blueprint schema frozen), ADR-0012 (artifact immutability), ADR-0013
+  (SkillArtifactBundle reservation); pipeline docs `Docs/TRUTH/pipeline/01–10`.
+- Tests: 214 Phase-7 tests; full suite **694 passing**.
+
+## Phase 6 — Evolution Engine
+
+**Status: COMPLETE · VALIDATED · FROZEN**
+
+Analysis-only, fully dormant (ADR-0008). Observe → aggregate → measure →
+consolidate → recommend, in `backend/brain/evolution/`.
+
+- 6.1 EvolutionObserver + append-only EvolutionStore
+- 6.2 StrategyEvaluator → StrategyAnalysis
+- 6.3 PerformanceAnalyzer → PerformanceAnalysis
+- 6.4 MemoryConsolidator → ConsolidationProposalSet
+- 6.5 RecommendationEngine → EvolutionRecommendationSet
+- 6.6 Validation & Freeze
+
 ## Phase 5.9 — Workspace Reasoning
 
 **Status: COMPLETE · VALIDATED · FROZEN**

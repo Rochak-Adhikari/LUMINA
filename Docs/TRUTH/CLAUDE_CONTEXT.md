@@ -47,23 +47,29 @@ The core engine should remain stable while capabilities grow through reusable sk
 
 Current Phase:
 
-Phase 4 — Stable Runtime Recovery: ✅ COMPLETE (2026-07-17)
+Phase 7 — Skill Creator: ✅ COMPLETE · FROZEN
 
-Next phase: Phase 5 (awaiting kickoff approval)
+Next phase: Phase 8 (Skill Runtime — awaiting kickoff)
 
 Completed:
 
 ✅ Phase 1 — Runtime Foundation
 
-✅ Phase 2 — Brain Architecture
+✅ Phase 2 — Brain Runtime & State
 
 ✅ Phase 3 — Interface Refactor & Clean Architecture
 
-✅ Phase 4 — Stable Runtime Recovery (Milestones 4.1–4.5; see Docs/Phase_4_Completion_Report.md)
+✅ Phase 4 — Stable Runtime Recovery (see Docs/Phase_4_Completion_Report.md)
+
+✅ Phase 5 — Cognitive Architecture (BrainCore, Planning, Skills, Workspace Memory, Reflection, Workspace Reasoning) · FROZEN
+
+✅ Phase 6 — Evolution Engine (analysis-only, dormant) · FROZEN
+
+✅ Phase 7 — Skill Creator (10-stage pipeline, dormant) · FROZEN
 
 Future:
 
-Phase 5 — Memory Engine / Cognitive Architecture
+Phase 8 — Skill Runtime (consume RegistryEntry to use created skills) / Autonomous Planning
 
 Phase 6 — Planning Engine
 
@@ -187,7 +193,7 @@ Phase 4 is complete — the new architecture is load-bearing:
 
 - ⏸ Test consolidation deferred (pytest not provisioned in lumina env)
 
-Do NOT begin Phase 5 or Phase 6 implementation without explicit approval.
+Do NOT begin Phase 8 (Skill Runtime) implementation without explicit approval. Phases 5–7 are complete and frozen — consume them, never redesign.
 
 ---
 

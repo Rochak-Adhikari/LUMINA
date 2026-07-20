@@ -37,16 +37,33 @@ The backend application follows a clean, decoupled dependency-injected design:
 
 ## Current Implementation Status
 
+> Phase numbering below follows the authoritative engineering roadmap
+> (`Docs/TRUTH/ENGINEERING_ROADMAP.md`). Phases 1–4 = runtime foundation;
+> Phase 5 = Cognitive Architecture; Phase 6 = Evolution Engine; Phase 7 = Skill
+> Creator. Total test suite: **694 passing** (Phase 7: 214).
+
 | Stage / Phase | Focus | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | Runtime Foundation | ✅ Completed | Dependency Injection container (`core/container.py`), Application bootstrapper (`core/bootstrap.py`), Lifecycle hosting (`core/application.py`), and Context mapping (`core/context.py`) are implemented and verified via unit tests. |
-| **Phase 2** | Brain Architecture | 🟡 Partially Complete | The sandbox state class (`brain/state.py`) and pub/sub event bus (`brain/events.py`) are implemented and tested. Integration with active server routes is ongoing as legacy patterns are eliminated. |
-| **Phase 3** | Interface Refactor & Clean Architecture | ✅ Completed | The `SessionManager` (`core/session.py`) and `ServiceAccessor` (`core/service_accessor.py`) interfaces are fully implemented and integrated. All backend execution paths route through these abstractions. |
-| **Phase 4** | **Stable Runtime Recovery** | ✅ **COMPLETED** | **All milestones complete (2026-07-17)**. Milestones 4.1-4.3 (port recovery, AudioLoop DI, SessionManager wiring), 4.4 (DI finalization), and 4.5 (unified lifecycle) are complete. All legacy fallback patterns eliminated. Single-owner DI architecture achieved. |
-| **Phase 5** | Memory Engine | ❌ Not Started | **Next Phase**. Focuses on semantic memory storage, local vector search indexes, knowledge graph structures, and project/workspace context maps. |
-| **Phase 6** | Planning Engine | ❌ Not Started | Planned future phase. Focuses on structured task decomposition, reasoning chains, dynamic tool binding, and adaptive execution planners. |
+| **Phase 1** | Runtime Foundation | ✅ Completed | DI container (`core/container.py`), bootstrapper (`core/bootstrap.py`), lifecycle host, context mapping — implemented + tested. |
+| **Phase 2** | Brain Runtime & State | ✅ Completed | `brain/state.py`, `brain/events.py` implemented; server routes migrated. |
+| **Phase 3** | Interface Refactor & Clean Architecture | ✅ Completed | `SessionManager`, `ServiceAccessor` fully integrated. |
+| **Phase 4** | Stable Runtime Recovery | ✅ Completed | Port recovery, AudioLoop DI, unified lifecycle. Single-owner DI achieved. |
+| **Phase 5** | Cognitive Architecture | ✅ **COMPLETE · FROZEN** | BrainCore, Planning (Rule/LLM/Chain), Skills, Capability Layer, Workspace Memory, Reflection Engine, Workspace Activation, Workspace Reasoning (`backend/brain/core`, `brain/planning`, `brain/skills`, `brain/workspace`, `brain/reflection`). |
+| **Phase 6** | Evolution Engine | ✅ **COMPLETE · FROZEN** | Analysis-only, dormant: Observer→Store→StrategyEvaluator→PerformanceAnalyzer + MemoryConsolidator → RecommendationEngine (`backend/brain/evolution`). |
+| **Phase 7** | Skill Creator | ✅ **COMPLETE · FROZEN** | Deterministic 10-stage pipeline (Builder→Verifier→Generator→Tester→Approver→Installer→Registry→Lifecycle→Marketplace→Rollback) in `backend/brain/skill_creator`; all dormant in DI. See `Docs/TRUTH/pipeline/*` + ADR-0009–0013. |
+| **Phase 8** | Autonomous Planning / Skill Runtime | ❌ Not Started | **Next Phase.** Runtime that consumes RegistryEntry to use created skills. |
 
 ---
+
+## Immediate Priorities
+
+**Phases 5, 6, and 7 are complete and frozen.** Next is **Phase 8** (Skill
+Runtime — consuming installed/registered skills). Documentation is being
+synchronized to match the implemented state. The runtime core (DI, EventBus,
+pipeline, RuntimeFacade) remains frozen — new capabilities register through
+Bootstrapper as dormant services, never through new globals.
+
+
 
 ## Current Technical Debt
 
@@ -66,9 +83,9 @@ The backend application follows a clean, decoupled dependency-injected design:
 
 ---
 
-## Phase 4 Implementation Plan
+## Phase 4 Implementation Plan (historical)
 
-The objective of Phase 4 is to eliminate the technical debt identified above, stabilize startup/shutdown lifecycles, complete dependency injection, and achieve clean architecture alignment.
+The objective of Phase 4 was to eliminate the technical debt identified above, stabilize startup/shutdown lifecycles, complete dependency injection, and achieve clean architecture alignment. (Phase 4 is complete; retained below for history.)
 
 ### Milestone 4.1: Graceful Startup, Port Recovery & Logging ✅ Complete
 *   **Objective**: Implement a self-healing port recovery system to handle socket starvation, and improve system startup logs.
@@ -109,11 +126,12 @@ The objective of Phase 4 is to eliminate the technical debt identified above, st
 
 ---
 
-## Immediate Priorities
-**Phase 4 (Stable Runtime Recovery) is complete.** The next phase of work is **Phase 5**, whose design direction (cognitive architecture: BrainCore, Planner, Skill Registry) has been drafted and awaits milestone breakdown. Immediate priorities:
-1.  Provision pytest/pytest-asyncio in the lumina conda env and consolidate the `core/`/`brain/` phase tests into `backend/tests/` (deferred 4.5 item).
-2.  Begin Phase 5 milestone 5.1 (BrainCore skeleton) upon approval.
-3.  Keep the DI/lifecycle architecture frozen — new capabilities register through Bootstrapper and cleanup hooks, never through new globals.
+## Historical Notes (Phase 4)
+**Phase 4 (Stable Runtime Recovery) completed 2026-07-17.** Cognitive
+Architecture (Phase 5), Evolution Engine (Phase 6), and Skill Creator (Phase 7)
+have since been completed and frozen (see the status table above). The
+DI/lifecycle architecture remains frozen — new capabilities register through
+Bootstrapper and cleanup hooks, never through new globals.
 
 ---
 

@@ -111,9 +111,9 @@ core.
 The Evolution Engine is an **analysis layer** (ADR-0008). It observes, measures,
 analyzes, evaluates, and recommends. It **never mutates runtime**, rewrites
 planners, edits prompts, creates skills, or writes memory. Phase 6 decides WHAT
-should evolve; Phase 7 (future) performs the approved evolution behind human
-approval. Every component is **dormant** — registered in DI but consumed by no
-runtime path, so runtime stays byte-identical.
+should evolve; Phase 7 (Skill Creator, complete) performs the approved evolution
+behind human approval. Every component is **dormant** — registered in DI but
+consumed by no runtime path, so runtime stays byte-identical.
 
 Pipeline (each layer consumes only the previous layer's immutable output):
 
@@ -152,6 +152,47 @@ UUID, no timestamps, no randomness).
 
 ---
 
+## 4b. Skill Creator — Phase 7
+
+The Skill Creator is a deterministic **compiler pipeline** (ADR-0010) that turns
+an approved evolution recommendation into an installed, registered skill. Ten
+stages, each a small dormant DI-registered class producing exactly one frozen
+immutable artifact; no stage mutates a prior artifact (ADR-0012). Implemented in
+`backend/brain/skill_creator/`. Full detail in `Docs/TRUTH/pipeline/01–10` and
+ADR-0009–0013.
+
+```
+EvolutionRecommendationSet
+ → 01 Builder       → SkillBlueprintSet
+ → 02 Verifier      → VerificationResult
+ → 03 Generator     → GenerationResult
+ → 04 Tester        → TestResult
+ → 05 Approver      → ApprovalRecord      (mandatory human gate)
+ → 06 Installer     → InstallationRecord  (first filesystem write)
+ → 07 Registry      → RegistryEntry       (append-only)
+ → 08 Lifecycle     → LifecycleEvent[]    (append-only)
+ → 09 Marketplace   → MarketplaceManifest (descriptive; no networking)
+ → 10 Rollback      → RollbackRecord      (reverses installation)
+```
+
+- **7.1 Foundation** — contracts (`ISkillCreator`, frozen `SkillBlueprint`).
+- **7.2 Blueprint Builder** — deterministic recommendation→blueprint mapping;
+  schema hardened + frozen in 7.2.5/7.2.6/7.2.7 (ADR-0011).
+- **7.3 Verification** — static checks (schema/capabilities/permissions/risk).
+- **7.4 Generation** — deterministic package descriptors; gated on verification.
+- **7.5 Testing** — static category checks (unit/determinism/safety); gated on generation.
+- **7.6 Approval** — mandatory human gate; never auto-approves.
+- **7.7 Installation** — materializes files to disk; idempotent; gated on approval.
+- **7.8 Registry** — append-only catalog keyed by semantic fingerprint.
+- **7.9 Lifecycle** — append-only state events (activate/deactivate/archive/supersede).
+- **7.10 Marketplace** — portable manifest; descriptive, no networking.
+- **7.11 Rollback** — reverses only installer-created files; idempotent.
+
+Every stage: deterministic, immutable output, gated on the prior artifact,
+dormant in DI (no runtime consumer yet — that is Phase 8, the Skill Runtime).
+
+---
+
 ## 5. Determinism & Boundaries (why it's safe)
 
 - **Frozen core**: runtime core is never modified by later phases.
@@ -163,8 +204,8 @@ UUID, no timestamps, no randomness).
   output.
 - **Dormancy**: Evolution components are registered but never auto-invoked;
   runtime behavior is byte-identical to Phase 5.
-- **Human approval**: any future runtime-visible evolution (Phase 7) stays behind
-  a human approval gate.
+- **Human approval**: any runtime-visible evolution (Phase 7 Approval stage)
+  stays behind a mandatory human approval gate.
 
 ---
 
@@ -172,7 +213,10 @@ UUID, no timestamps, no randomness).
 
 - Phase 5 (Cognitive Architecture / Workspace Reasoning): **COMPLETE · FROZEN**.
 - Phase 6 (Evolution Engine): **COMPLETE · VALIDATED · FROZEN**.
-- Phase 7 (Skill Creator): **NOT STARTED** — will consume
-  `EvolutionRecommendationSet` without modifying any Phase 6 code.
+- Phase 7 (Skill Creator): **COMPLETE · VALIDATED · FROZEN** — 10-stage pipeline
+  consuming `EvolutionRecommendationSet`, dormant in DI.
+- Phase 8 (Skill Runtime): **NOT STARTED** — will consume `RegistryEntry` to use
+  created skills.
 
-Test coverage: full Phase 5 + Phase 6 regression suite passing (480 tests).
+Test coverage: full Phase 5 + 6 + 7 regression suite passing (**694 tests**;
+214 Phase 7).

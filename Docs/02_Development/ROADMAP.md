@@ -16,13 +16,17 @@
   Strategy Improvement, Performance Analysis, Memory Consolidation, Self
   Evolution (Recommendation Engine), Validation & Freeze. **Complete · validated
   · frozen.**
+- **Phase 7 — Skill Creator** — deterministic 10-stage compiler pipeline
+  (Builder→Verifier→Generator→Tester→Approver→Installer→Registry→Lifecycle→
+  Marketplace→Rollback), all stages dormant in DI. **Complete · validated ·
+  frozen.**
 
 ## Next
 
-- **Phase 7 — Skill Creator** — consumes `EvolutionRecommendationSet` behind human
-  approval to generate, validate, package, install, and register skills. Not
-  started.
-- **Phase 8 — Autonomous Planning** — long-horizon goals, multi-step execution,
+- **Phase 8 — Skill Runtime** — the runtime that USES created skills: consumes
+  `RegistryEntry` and runtime requests to discover, validate, sandbox, load, and
+  execute installed skills. Not started.
+- **Autonomous Planning** — long-horizon goals, multi-step execution,
   self-scheduling. Not started.
 
 For how each shipped feature works, see `Docs/04_Guides/FEATURE_GUIDE.md`.
