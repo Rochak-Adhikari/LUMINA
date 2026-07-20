@@ -118,7 +118,7 @@ class TestDIRegistration(unittest.TestCase):
 
     def test_skill_registry_still_19(self):
         from brain.skills.registry import SkillRegistry
-        self.assertEqual(len(self.container.resolve(SkillRegistry)), 19)
+        self.assertEqual(len(self.container.resolve(SkillRegistry)), 12)
 
 
 class TestNoForbiddenImports(unittest.TestCase):

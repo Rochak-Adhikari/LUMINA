@@ -13,18 +13,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 class TestToolDefinitions:
     """Test tool definition schemas."""
-    
-    def test_generate_cad_tool_schema(self):
-        """Test generate_cad tool has correct schema."""
-        from lumina import generate_cad
-        
-        assert generate_cad['name'] == 'generate_cad'
-        assert 'description' in generate_cad
-        assert 'parameters' in generate_cad
-        assert generate_cad['parameters']['type'] == 'OBJECT'
-        assert 'prompt' in generate_cad['parameters']['properties']
-        print(f"generate_cad tool: {generate_cad['name']}")
-    
+
     def test_run_web_agent_tool_schema(self):
         """Test run_web_agent tool has correct schema."""
         from lumina import run_web_agent
@@ -35,55 +24,12 @@ class TestToolDefinitions:
         assert 'prompt' in run_web_agent['parameters']['properties']
         print(f"run_web_agent tool: {run_web_agent['name']}")
     
-    def test_print_stl_tool_schema(self):
-        """Test print_stl tool has correct schema."""
-        from lumina import print_stl_tool
-        
-        assert print_stl_tool['name'] == 'print_stl'
-        assert 'description' in print_stl_tool
-        assert 'parameters' in print_stl_tool
-        print(f"print_stl tool: {print_stl_tool['name']}")
-    
-    def test_discover_printers_tool_schema(self):
-        """Test discover_printers tool has correct schema."""
-        from lumina import discover_printers_tool
-        
-        assert discover_printers_tool['name'] == 'discover_printers'
-        assert 'description' in discover_printers_tool
-        print(f"discover_printers tool: {discover_printers_tool['name']}")
-    
-    def test_list_smart_devices_tool_schema(self):
-        """Test list_smart_devices tool has correct schema."""
-        from lumina import list_smart_devices_tool
-        
-        assert list_smart_devices_tool['name'] == 'list_smart_devices'
-        assert 'description' in list_smart_devices_tool
-        print(f"list_smart_devices tool: {list_smart_devices_tool['name']}")
-    
-    def test_control_light_tool_schema(self):
-        """Test control_light tool has correct schema."""
-        from lumina import control_light_tool
-        
-        assert control_light_tool['name'] == 'control_light'
-        assert 'parameters' in control_light_tool
-        props = control_light_tool['parameters']['properties']
-        assert 'target' in props
-        assert 'action' in props
-        print(f"control_light tool: {control_light_tool['name']}")
-    
     def test_list_projects_tool_schema(self):
         """Test list_projects tool has correct schema."""
         from lumina import list_projects_tool
-        
+
         assert list_projects_tool['name'] == 'list_projects'
         print(f"list_projects tool: {list_projects_tool['name']}")
-    
-    def test_iterate_cad_tool_schema(self):
-        """Test iterate_cad tool has correct schema."""
-        from lumina import iterate_cad_tool
-        
-        assert iterate_cad_tool['name'] == 'iterate_cad'
-        print(f"iterate_cad tool: {iterate_cad_tool['name']}")
 
 
 class TestAudioLoopClass:
@@ -106,7 +52,6 @@ class TestAudioLoopClass:
             'listen_audio',
             'receive_audio',
             'play_audio',
-            'handle_cad_request',
             'handle_web_agent_request',
             'resolve_tool_confirmation',
             'update_permissions',
@@ -166,30 +111,12 @@ class TestToolPermissions:
 
 class TestAgentImports:
     """Test agent module imports in lumina.py."""
-    
-    def test_cad_agent_import(self):
-        """Test CadAgent is imported."""
-        from lumina import CadAgent
-        assert CadAgent is not None
-        print("CadAgent imported")
-    
+
     def test_web_agent_import(self):
         """Test WebAgent is imported."""
         from lumina import WebAgent
         assert WebAgent is not None
         print("WebAgent imported")
-    
-    def test_kasa_agent_import(self):
-        """Test KasaAgent is imported."""
-        from lumina import KasaAgent
-        assert KasaAgent is not None
-        print("KasaAgent imported")
-    
-    def test_printer_agent_import(self):
-        """Test PrinterAgent is imported."""
-        from lumina import PrinterAgent
-        assert PrinterAgent is not None
-        print("PrinterAgent imported")
 
 
 class TestToolConfirmation:

@@ -59,7 +59,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import lumina
 from authenticator import FaceAuthenticator
-from kasa_agent import KasaAgent
 from persona_engine import init_persona_engine, get_persona_engine
 
 # Phase 4.4: MemoryEngine is a DI-managed lazy singleton (IKnowledgeManager,
@@ -93,7 +92,6 @@ async def shutdown_event():
 # Phase 4.3: audio_loop, loop_task, and authenticator are no longer module
 # globals — they are owned by the DI-registered SessionManager (_session_mgr)
 # and read via _session_mgr.audio_loop / .loop_task / .authenticator.
-kasa_agent = None  # constructed later from settings (see tool-permission block below)
 SETTINGS_FILE = "settings.json"
 
 # Phase D.1.a: Client connection tracking for heartbeat
@@ -346,7 +344,6 @@ DEFAULT_SETTINGS = {
         # ========================================
         # ALL TOOLS DISABLED BY DEFAULT (Phase B.1)
         # ========================================
-        "generate_cad": False,
         "run_web_agent": False,
         "write_file": False,
         "read_directory": False,
@@ -355,12 +352,6 @@ DEFAULT_SETTINGS = {
         "switch_project": False,
         "list_projects": False,
         "create_directory": False,
-        "list_smart_devices": False,
-        "control_light": False,
-        "discover_printers": False,
-        "print_stl": False,
-        "get_print_status": False,
-        "iterate_cad": False,
         "browser_control": True,
         "local_browser_control": False,
         "youtube_play":    True,
@@ -388,7 +379,6 @@ DEFAULT_SETTINGS = {
     "persona_strict_sensitivity": 0.5,
     "persona_adaptive_mode": True,
     "printers": [],
-    "kasa_devices": [],
     "camera_flipped": False,
     "auto_capture_tasks": True,
     # Phase 5.4 Order 8: gate the cognitive (Brain) text path. Default False —
@@ -480,13 +470,6 @@ _reapply_tool_clamp()
 print(f"[TOOL CLAMP] mode={_clamp_mode}  permissions after clamp: {SETTINGS['tool_permissions']}" if _clamp_mode == "on"
       else f"[TOOL CLAMP] Clamp OFF — using saved settings: {SETTINGS['tool_permissions']}")
 
-# Only initialize Kasa agent if smart device tools are enabled
-if SETTINGS["tool_permissions"].get("list_smart_devices", False):
-    kasa_agent = KasaAgent(known_devices=SETTINGS.get("kasa_devices"))
-    print("[SERVER] Kasa agent initialized")
-else:
-    kasa_agent = None
-    print("[SERVER] Kasa tools DISABLED - skipping Kasa agent initialization")
 # tool_permissions is now SETTINGS["tool_permissions"]
 
 # ========================================
@@ -501,12 +484,12 @@ else:
 # Bootstrapper does not own that registration.
 # ========================================
 from core.container import container
-from core.interfaces import ISmartHomeAgent, IMemoryManager, IWorkspaceManager, IBrainState, IEventBus
+from core.interfaces import IMemoryManager, IWorkspaceManager, IBrainState, IEventBus
 from core.bootstrap import Bootstrapper
 from core.application import ApplicationHost
 
 # Phase 4.5: Create ApplicationHost and Bootstrapper, then cross-register
-_bootstrapper = Bootstrapper(container=container, kasa_agent=kasa_agent)
+_bootstrapper = Bootstrapper(container=container)
 _app_host = ApplicationHost(container=container, bootstrapper=_bootstrapper)
 
 # Pass ApplicationHost to Bootstrapper for DI registration
@@ -787,13 +770,6 @@ async def startup_event():
         print(f"[SERVER DEBUG] Current Policy: {type(policy)}")
     except Exception as e:
         print(f"[SERVER DEBUG] Error checking loop: {e}")
-
-    # Only initialize Kasa agent if tools are enabled
-    if kasa_agent is not None:
-        print("[SERVER] Startup: Initializing Kasa Agent...")
-        await kasa_agent.initialize()
-    else:
-        print("[SERVER] Startup: Kasa agent DISABLED - skipping initialization")
 
     # Start the reminder alarm scheduler
     _alarm_task = asyncio.create_task(_reminder_alarm_loop())
@@ -1269,12 +1245,6 @@ async def start_audio(sid, data=None):
                 'text': f'📁 Project set to: {project_name}. Global memory stays shared across projects; project chat/files are scoped here.'
             }))
 
-    # Callback to send Device Update to frontend
-    def on_device_update(devices):
-        # devices is a list of dicts
-        print(f"Sending Kasa Device Update: {len(devices)} devices")
-        asyncio.create_task(sio.emit('kasa_devices', devices))
-
     # Callback to send Error to frontend
     def on_error(msg):
         print(f"Sending Error to frontend: {msg}")
@@ -1309,13 +1279,11 @@ async def start_audio(sid, data=None):
             on_cad_status=on_cad_status,
             on_cad_thought=on_cad_thought,
             on_project_update=on_project_update,
-            on_device_update=on_device_update,
             on_error=on_error,
             on_model_status=on_model_status,  # Phase D.1.c: Gemini Live status
 
             input_device_index=device_index,
             input_device_name=device_name,
-            kasa_agent=kasa_agent,
             memory_store=mem_store,
             project_manager=proj_mgr
         )
@@ -1485,26 +1453,6 @@ async def start_audio(sid, data=None):
         print("Emitting 'Lumina Started'")
         await sio.emit('status', {'msg': 'Lumina Started'})
 
-        # Load saved printers ONLY if printer tools are enabled
-        if SETTINGS["tool_permissions"].get("discover_printers", False):
-            saved_printers = SETTINGS.get("printers", [])
-            if saved_printers and audio_loop.printer_agent:
-                print(f"[SERVER] Loading {len(saved_printers)} saved printers...")
-                for p in saved_printers:
-                    audio_loop.printer_agent.add_printer_manually(
-                        name=p.get("name", p["host"]),
-                        host=p["host"],
-                        port=p.get("port", 80),
-                        printer_type=p.get("type", "moonraker"),
-                        camera_url=p.get("camera_url")
-                    )
-            
-            # Start Printer Monitor ONLY if enabled
-            asyncio.create_task(monitor_printers_loop())
-            print("[SERVER] Printer monitoring enabled")
-        else:
-            print("[SERVER] Printer tools DISABLED - skipping printer initialization")
-        
     except Exception as e:
         print(f"CRITICAL ERROR STARTING LUMINA: {e}")
         import traceback
@@ -1512,39 +1460,6 @@ async def start_audio(sid, data=None):
         await sio.emit('error', {'msg': f"Failed to start: {str(e)}"})
         _session_mgr.detach()  # Phase 4.3: ensure we can try again
 
-
-async def monitor_printers_loop():
-    """Background task to query printer status periodically."""
-    print("[SERVER] Starting Printer Monitor Loop")
-    # Phase 4.3: query the live session via SessionManager each pass
-    while _session_mgr.audio_loop and _session_mgr.audio_loop.printer_agent:
-        try:
-            agent = _session_mgr.audio_loop.printer_agent
-            if not agent.printers:
-                await asyncio.sleep(5)
-                continue
-                
-            tasks = []
-            for host, printer in agent.printers.items():
-                if printer.printer_type.value != "unknown":
-                    tasks.append(agent.get_print_status(host))
-            
-            if tasks:
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                for res in results:
-                    if isinstance(res, Exception):
-                        pass # Ignore errors for now
-                    elif res:
-                        # res is PrintStatus object
-                        await sio.emit('print_status_update', res.to_dict())
-                        
-        except asyncio.CancelledError:
-            print("[SERVER] Printer Monitor Cancelled")
-            break
-        except Exception as e:
-            print(f"[SERVER] Monitor Loop Error: {e}")
-            
-        await asyncio.sleep(2) # Update every 2 seconds for responsiveness
 
 @sio.event
 async def stop_audio(sid):
@@ -2639,127 +2554,6 @@ async def process_file(sid, data):
         }, room=sid)
 
 @sio.event
-async def discover_kasa(sid):
-    print(f"Received discover_kasa request")
-    
-    # Guard: If tools disabled or kasa_agent is None, return empty
-    if not SETTINGS["tool_permissions"].get("list_smart_devices", False) or kasa_agent is None:
-        print("[TOOLS] Kasa tools DISABLED - returning empty device list")
-        await sio.emit('kasa_devices', [])
-        await sio.emit('status', {'msg': 'Kasa tools are disabled'})
-        return
-    
-    try:
-        devices = await kasa_agent.discover_devices()
-        await sio.emit('kasa_devices', devices)
-        await sio.emit('status', {'msg': f"Found {len(devices)} Kasa devices"})
-        
-        # Save to settings
-        # devices is a list of full device info dicts. minimizing for storage.
-        saved_devices = []
-        for d in devices:
-            saved_devices.append({
-                "ip": d["ip"],
-                "alias": d["alias"],
-                "model": d["model"]
-            })
-        
-        # Merge with existing to preserve any manual overrides? 
-        # For now, just overwrite with latest scan result + previously known if we want to be fancy,
-        # but user asked for "Any new devices that are scanned are added there".
-        # A simple full persistence of current state is safest.
-        SETTINGS["kasa_devices"] = saved_devices
-        save_settings()
-        print(f"[SERVER] Saved {len(saved_devices)} Kasa devices to settings.")
-        
-    except Exception as e:
-        print(f"Error discovering kasa: {e}")
-        await sio.emit('error', {'msg': f"Kasa Discovery Failed: {str(e)}"})
-
-@sio.event
-async def iterate_cad(sid, data):
-    audio_loop = _session_mgr.audio_loop  # Phase 4.3: query via SessionManager
-    # data: { prompt: "make it bigger" }
-    prompt = data.get('prompt')
-    print(f"Received iterate_cad request: '{prompt}'")
-    
-    if not audio_loop or not audio_loop.cad_agent:
-        await sio.emit('error', {'msg': "CAD Agent not available"})
-        return
-
-    try:
-        # Notify user work has started
-        await sio.emit('status', {'msg': 'Iterating design...'})
-        await sio.emit('cad_status', {'status': 'generating'})
-        
-        # Call the agent with project path
-        cad_output_dir = str(_svc.project_manager.get_current_project_path() / "cad")
-        result = await audio_loop.cad_agent.iterate_prototype(prompt, output_dir=cad_output_dir)
-        
-        if result:
-            info = f"{len(result.get('data', ''))} bytes (STL)"
-            print(f"Sending updated CAD data: {info}")
-            await sio.emit('cad_data', result)
-            # Save to Project
-            if 'file_path' in result:
-                saved_path = _svc.project_manager.save_cad_artifact(result['file_path'], prompt)
-                if saved_path:
-                    print(f"[SERVER] Saved iterated CAD to {saved_path}")
-
-            await sio.emit('status', {'msg': 'Design updated'})
-        else:
-            await sio.emit('error', {'msg': 'Failed to update design'})
-            
-    except Exception as e:
-        print(f"Error iterating CAD: {e}")
-        await sio.emit('error', {'msg': f"Iteration Error: {str(e)}"})
-
-@sio.event
-async def generate_cad(sid, data):
-    audio_loop = _session_mgr.audio_loop  # Phase 4.3: query via SessionManager
-    # data: { prompt: "make a cube" }
-    prompt = data.get('prompt')
-    print(f"Received generate_cad request: '{prompt}'")
-    
-    if not audio_loop or not audio_loop.cad_agent:
-        await sio.emit('error', {'msg': "CAD Agent not available"})
-        return
-
-    try:
-        await sio.emit('status', {'msg': 'Generating new design...'})
-        await sio.emit('cad_status', {'status': 'generating'})
-        
-        # Use generate_prototype based on prompt with project path resolved via WorkspaceManager
-        try:
-            workspace_mgr = _runtime_facade.workspace_manager
-            project_path = workspace_mgr.get_current_project_path()
-        except Exception:
-            project_path = _svc.project_manager.get_current_project_path()
-            
-        cad_output_dir = str(project_path / "cad")
-        result = await audio_loop.cad_agent.generate_prototype(prompt, output_dir=cad_output_dir)
-        
-        if result:
-            info = f"{len(result.get('data', ''))} bytes (STL)"
-            print(f"Sending newly generated CAD data: {info}")
-            await sio.emit('cad_data', result)
-
-
-            # Save to Project
-            if 'file_path' in result:
-                saved_path = _svc.project_manager.save_cad_artifact(result['file_path'], prompt)
-                if saved_path:
-                    print(f"[SERVER] Saved generated CAD to {saved_path}")
-
-            await sio.emit('status', {'msg': 'Design generated'})
-        else:
-            await sio.emit('error', {'msg': 'Failed to generate design'})
-            
-    except Exception as e:
-        print(f"Error generating CAD: {e}")
-        await sio.emit('error', {'msg': f"Generation Error: {str(e)}"})
-
-@sio.event
 async def prompt_web_agent(sid, data):
     audio_loop = _session_mgr.audio_loop  # Phase 4.3: query via SessionManager
     # data: { prompt: "find xyz" }
@@ -2790,264 +2584,6 @@ async def prompt_web_agent(sid, data):
     except Exception as e:
         print(f"Error running Web Agent: {e}")
         await sio.emit('error', {'msg': f"Web Agent Error: {str(e)}"})
-
-@sio.event
-async def discover_printers(sid):
-    audio_loop = _session_mgr.audio_loop  # Phase 4.3: query via SessionManager
-    print("Received discover_printers request")
-    
-    # Guard: If tools disabled, return empty
-    if not SETTINGS["tool_permissions"].get("discover_printers", False):
-        print("[TOOLS] Printer tools DISABLED - returning empty printer list")
-        await sio.emit('printer_list', [])
-        await sio.emit('status', {'msg': 'Printer tools are disabled'})
-        return
-    
-    # If audio_loop isn't ready yet, return saved printers from settings
-    if not audio_loop or not audio_loop.printer_agent:
-        saved_printers = SETTINGS.get("printers", [])
-        if saved_printers:
-            # Convert saved printers to the expected format
-            printer_list = []
-            for p in saved_printers:
-                printer_list.append({
-                    "name": p.get("name", p["host"]),
-                    "host": p["host"],
-                    "port": p.get("port", 80),
-                    "printer_type": p.get("type", "unknown"),
-                    "camera_url": p.get("camera_url")
-                })
-            print(f"[SERVER] Returning {len(printer_list)} saved printers (audio_loop not ready)")
-            await sio.emit('printer_list', printer_list)
-            return
-        else:
-            await sio.emit('printer_list', [])
-            await sio.emit('status', {'msg': "Connect to Lumina to enable printer discovery"})
-            return
-        
-    try:
-        printers = await audio_loop.printer_agent.discover_printers()
-        await sio.emit('printer_list', printers)
-        await sio.emit('status', {'msg': f"Found {len(printers)} printers"})
-    except Exception as e:
-        print(f"Error discovering printers: {e}")
-        await sio.emit('error', {'msg': f"Printer Discovery Failed: {str(e)}"})
-
-@sio.event
-async def add_printer(sid, data):
-    audio_loop = _session_mgr.audio_loop  # Phase 4.3: query via SessionManager
-    # data: { host: "192.168.1.50", name: "My Printer", type: "moonraker" }
-    raw_host = data.get('host')
-    name = data.get('name') or raw_host
-    ptype = data.get('type', "moonraker")
-    
-    # Parse port if present
-    if ":" in raw_host:
-        host, port_str = raw_host.split(":")
-        port = int(port_str)
-    else:
-        host = raw_host
-        port = 80
-    
-    print(f"Received add_printer request: {host}:{port} ({ptype})")
-    
-    if not audio_loop or not audio_loop.printer_agent:
-        await sio.emit('error', {'msg': "Printer Agent not available"})
-        return
-        
-    try:
-        # Add manually
-        camera_url = data.get('camera_url')
-        printer = audio_loop.printer_agent.add_printer_manually(name, host, port=port, printer_type=ptype, camera_url=camera_url)
-        
-        # Save to settings
-        new_printer_config = {
-            "name": name,
-            "host": host,
-            "port": port,
-            "type": ptype,
-            "camera_url": camera_url
-        }
-        
-        # Check if already exists to avoid duplicates
-        exists = False
-        for p in SETTINGS.get("printers", []):
-            if p["host"] == host and p["port"] == port:
-                exists = True
-                break
-        
-        if not exists:
-            if "printers" not in SETTINGS:
-                SETTINGS["printers"] = []
-            SETTINGS["printers"].append(new_printer_config)
-            save_settings()
-            print(f"[SERVER] Saved printer {name} to settings.")
-        
-        # Probe to confirm/correct type
-        print(f"Probing {host} to confirm type...")
-        # Try port 7125 (Moonraker) and 4408 (Fluidd/K1) 
-        ports_to_try = [80, 7125, 4408]
-        
-        actual_type = "unknown"
-        for port in ports_to_try:
-             found_type = await audio_loop.printer_agent._probe_printer_type(host, port)
-             if found_type.value != "unknown":
-                 actual_type = found_type
-                 # Update port if different
-                 if port != 80:
-                     printer.port = port
-                 break
-        
-        if actual_type != "unknown" and actual_type != printer.printer_type:
-             printer.printer_type = actual_type
-             print(f"Corrected type to {actual_type.value} on port {printer.port}")
-             
-        # Refresh list for everyone
-        printers = [p.to_dict() for p in audio_loop.printer_agent.printers.values()]
-        await sio.emit('printer_list', printers)
-        await sio.emit('status', {'msg': f"Added printer: {name}"})
-        
-    except Exception as e:
-        print(f"Error adding printer: {e}")
-        await sio.emit('error', {'msg': f"Failed to add printer: {str(e)}"})
-
-@sio.event
-async def print_stl(sid, data):
-    audio_loop = _session_mgr.audio_loop  # Phase 4.3: query via SessionManager
-    print(f"Received print_stl request: {data}")
-    # data: { stl_path: "path/to.stl" | "current", printer: "name_or_ip", profile: "optional" }
-    
-    # Guard: If tools disabled, return error
-    if not SETTINGS["tool_permissions"].get("print_stl", False):
-        print("[TOOLS] Print tools DISABLED - ignoring print_stl request")
-        await sio.emit('error', {'msg': 'Print tools are disabled'})
-        return
-    
-    if not audio_loop or not audio_loop.printer_agent:
-        await sio.emit('error', {'msg': "Printer Agent not available"})
-        return
-        
-    try:
-        stl_path = data.get('stl_path', 'current')
-        printer_name = data.get('printer')
-        profile = data.get('profile')
-        
-        if not printer_name:
-             await sio.emit('error', {'msg': "No printer specified"})
-             return
-             
-        await sio.emit('status', {'msg': f"Preparing print for {printer_name}..."})
-        
-        # Get current project path for resolution
-        current_project_path = None
-        if _svc.has_project_manager:
-            current_project_path = str(_svc.project_manager.get_current_project_path())
-            print(f"[SERVER DEBUG] Using project path: {current_project_path}")
-
-        # Resolve STL path before slicing so we can preview it
-        resolved_stl = audio_loop.printer_agent._resolve_file_path(stl_path, current_project_path)
-        
-        if resolved_stl and os.path.exists(resolved_stl):
-            # Open the STL in the CAD module for preview
-            try:
-                import base64
-                with open(resolved_stl, 'rb') as f:
-                    stl_data = f.read()
-                stl_b64 = base64.b64encode(stl_data).decode('utf-8')
-                stl_filename = os.path.basename(resolved_stl)
-                
-                print(f"[SERVER] Opening STL in CAD module: {stl_filename}")
-                await sio.emit('cad_data', {
-                    'format': 'stl',
-                    'data': stl_b64,
-                    'filename': stl_filename
-                })
-            except Exception as e:
-                print(f"[SERVER] Warning: Could not preview STL: {e}")
-        
-        # Progress Callback
-        async def on_slicing_progress(percent, message):
-            await sio.emit('slicing_progress', {
-                'printer': printer_name,
-                'percent': percent,
-                'message': message
-            })
-            if percent < 100:
-                 await sio.emit('status', {'msg': f"Slicing: {percent}%"})
-
-        result = await audio_loop.printer_agent.print_stl(
-            stl_path, 
-            printer_name, 
-            profile,
-            progress_callback=on_slicing_progress,
-            root_path=current_project_path
-        )
-        
-        await sio.emit('print_result', result)
-        await sio.emit('status', {'msg': f"Print Job: {result.get('status', 'unknown')}"})
-        
-    except Exception as e:
-        print(f"Error printing STL: {e}")
-        await sio.emit('error', {'msg': f"Print Failed: {str(e)}"})
-
-@sio.event
-async def get_slicer_profiles(sid):
-    """Get available OrcaSlicer profiles for manual selection."""
-    audio_loop = _session_mgr.audio_loop  # Phase 4.3: query via SessionManager
-    print("Received get_slicer_profiles request")
-    if not audio_loop or not audio_loop.printer_agent:
-        await sio.emit('error', {'msg': "Printer Agent not available"})
-        return
-    
-    try:
-        profiles = audio_loop.printer_agent.get_available_profiles()
-        await sio.emit('slicer_profiles', profiles)
-    except Exception as e:
-        print(f"Error getting slicer profiles: {e}")
-        await sio.emit('error', {'msg': f"Failed to get profiles: {str(e)}"})
-
-@sio.event
-async def control_kasa(sid, data):
-    # data: { ip, action: "on"|"off"|"brightness"|"color", value: ... }
-    ip = data.get('ip')
-    action = data.get('action')
-    print(f"Kasa Control: {ip} -> {action}")
-    
-    # Guard: If tools disabled or kasa_agent is None, return error
-    if not SETTINGS["tool_permissions"].get("control_light", False) or kasa_agent is None:
-        print("[TOOLS] Kasa control DISABLED - ignoring control_kasa request")
-        await sio.emit('error', {'msg': 'Kasa tools are disabled'})
-        return
-    
-    try:
-        success = False
-        if action == "on":
-            success = await kasa_agent.turn_on(ip)
-        elif action == "off":
-            success = await kasa_agent.turn_off(ip)
-        elif action == "brightness":
-            val = data.get('value')
-            success = await kasa_agent.set_brightness(ip, val)
-        elif action == "color":
-            # value is {h, s, v} - convert to tuple for set_color
-            h = data.get('value', {}).get('h', 0)
-            s = data.get('value', {}).get('s', 100)
-            v = data.get('value', {}).get('v', 100)
-            success = await kasa_agent.set_color(ip, (h, s, v))
-        
-        if success:
-            await sio.emit('kasa_update', {
-                'ip': ip,
-                'is_on': True if action == "on" else (False if action == "off" else None),
-                'brightness': data.get('value') if action == "brightness" else None,
-            })
- 
-        else:
-             await sio.emit('error', {'msg': f"Failed to control device {ip}"})
-
-    except Exception as e:
-         print(f"Error controlling kasa: {e}")
-         await sio.emit('error', {'msg': f"Kasa Control Error: {str(e)}"})
 
 @sio.event
 async def get_settings(sid):

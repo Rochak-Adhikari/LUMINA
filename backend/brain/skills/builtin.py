@@ -87,48 +87,6 @@ _TIER1_SKILLS: List[SkillSpec] = [
         tags=["workspace"], permissions=["list_projects"],
         provider="legacy", provider_ref="list_projects",
     ),
-    SkillSpec(
-        id="legacy.generate_cad", name="Generate CAD Model",
-        description="Generate a new 3D CAD prototype from a text description.",
-        tags=["cad", "3d"], permissions=["generate_cad"],
-        provider="legacy", provider_ref="generate_cad",
-    ),
-    SkillSpec(
-        id="legacy.iterate_cad", name="Iterate CAD Model",
-        description="Apply modifications to the most recent CAD design.",
-        tags=["cad", "3d"], permissions=["iterate_cad"],
-        provider="legacy", provider_ref="iterate_cad",
-    ),
-    SkillSpec(
-        id="legacy.discover_printers", name="Discover 3D Printers",
-        description="Scan the local network for 3D printers.",
-        tags=["printer", "3d"], permissions=["discover_printers"],
-        provider="legacy", provider_ref="discover_printers",
-    ),
-    SkillSpec(
-        id="legacy.print_stl", name="Print STL",
-        description="Slice an STL file and submit it to a 3D printer.",
-        tags=["printer", "3d"], permissions=["print_stl"],
-        provider="legacy", provider_ref="print_stl",
-    ),
-    SkillSpec(
-        id="legacy.get_print_status", name="Print Status",
-        description="Get the current status of a 3D print job.",
-        tags=["printer", "3d"], permissions=["get_print_status"],
-        provider="legacy", provider_ref="get_print_status",
-    ),
-    SkillSpec(
-        id="legacy.list_smart_devices", name="List Smart Devices",
-        description="List discovered TP-Link Kasa smart home devices.",
-        tags=["smarthome", "kasa"], permissions=["list_smart_devices"],
-        provider="legacy", provider_ref="list_smart_devices",
-    ),
-    SkillSpec(
-        id="legacy.control_light", name="Control Light",
-        description="Control TP-Link Kasa lights (on/off/brightness/color).",
-        tags=["smarthome", "kasa"], permissions=["control_light"],
-        provider="legacy", provider_ref="control_light",
-    ),
 ]
 
 # ---------------------------------------------------------------------------

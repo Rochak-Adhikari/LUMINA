@@ -19,9 +19,6 @@ from core.interfaces import (
     IMemoryManager,
     IKnowledgeManager,
     IWorkspaceManager,
-    ISmartHomeAgent,
-    ICadAgent,
-    IPrinterAgent,
     IModelGateway,
     IEventBus,
 )
@@ -37,9 +34,6 @@ __all__ = [
     "IMemoryManager",
     "IKnowledgeManager",
     "IWorkspaceManager",
-    "ISmartHomeAgent",
-    "ICadAgent",
-    "IPrinterAgent",
     "IModelGateway",
     "IEventBus",
     # Interfaces (Phase 1.2)

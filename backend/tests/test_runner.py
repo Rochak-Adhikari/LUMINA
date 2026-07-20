@@ -4,7 +4,7 @@ Master Test Runner for ada_v2.
 
 Usage:
     python tests/test_runner.py              # Run all tests
-    python tests/test_runner.py --module=kasa    # Run specific module
+    python tests/test_runner.py --module=printer # Run specific module
     python tests/test_runner.py --quick          # Quick sanity check
 """
 import subprocess
@@ -14,9 +14,6 @@ from pathlib import Path
 
 # Test modules mapping
 MODULES = {
-    "kasa": "test_kasa_agent.py",
-    "printer": "test_printer_agent.py",
-    "cad": "test_cad_agent.py",
     "web": "test_web_agent.py",
     "auth": "test_authenticator.py",
     "tools": "test_ada_tools.py",

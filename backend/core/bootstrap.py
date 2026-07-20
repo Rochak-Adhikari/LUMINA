@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from core.application import ApplicationHost
 
 from core.container import DependencyContainer
-from core.interfaces import IBrainState, IEventBus, IPipeline, ISmartHomeAgent, IMemoryManager, IWorkspaceManager, IKnowledgeManager
+from core.interfaces import IBrainState, IEventBus, IPipeline, IMemoryManager, IWorkspaceManager, IKnowledgeManager
 from brain.state import BrainState
 from brain.events import InProcessEventBus
 from core.context import ExecutionContextFactory
@@ -53,7 +53,6 @@ class Bootstrapper:
 
     def __init__(self, container: DependencyContainer, kasa_agent: Optional[Any] = None, app_host: Optional[ApplicationHost] = None) -> None:
         self._container = container
-        self._kasa_agent = kasa_agent
         self._app_host = app_host  # Phase 4.5: ApplicationHost reference for registration
         self.brain_state: Optional[BrainState] = None
         self.event_bus: Optional[InProcessEventBus] = None
@@ -81,7 +80,6 @@ class Bootstrapper:
 
     def bootstrap(self) -> None:
         """Construct and register all services owned by this bootstrapper."""
-        self._register_smart_home_agent()
         self._register_brain_state()
         self._register_event_bus()
         self._register_memory_store()
@@ -102,13 +100,6 @@ class Bootstrapper:
         if self._app_host is not None:
             self._container.register_instance(type(self._app_host), self._app_host)
             print("[DI] ApplicationHost registered")
-
-    def _register_smart_home_agent(self) -> None:
-        if self._kasa_agent is not None:
-            self._container.register_instance(ISmartHomeAgent, self._kasa_agent)
-            print("[DI] ISmartHomeAgent -> KasaAgent registered")
-        else:
-            print("[DI] ISmartHomeAgent - skipped (Kasa tools disabled)")
 
     def _register_brain_state(self) -> None:
         self.brain_state = BrainState()

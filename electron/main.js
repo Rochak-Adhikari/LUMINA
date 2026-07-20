@@ -135,7 +135,7 @@ function startPythonBackend() {
     pythonProcess.stdout.on('data', (data) => {
         const str = data.toString();
         console.log(`[Python]: ${str}`);
-        
+
         // Parse port if startup logs it
         const match = str.match(/\[STARTUP\] Starting Lumina backend on 0\.0\.0\.0:(\d+)/);
         if (match) {
@@ -167,7 +167,14 @@ function startPythonBackend() {
 app.whenReady().then(() => {
     // Intercept and redirect all localhost:8000/127.0.0.1:8000 traffic to the discovered backendPort
     session.defaultSession.webRequest.onBeforeRequest(
-        { urls: ['*://localhost:8000/*', '*://127.0.0.1:8000/*'] },
+        {
+            urls: [
+                'http://localhost:8000/*', 'https://localhost:8000/*',
+                'ws://localhost:8000/*', 'wss://localhost:8000/*',
+                'http://127.0.0.1:8000/*', 'https://127.0.0.1:8000/*',
+                'ws://127.0.0.1:8000/*', 'wss://127.0.0.1:8000/*'
+            ]
+        },
         (details, callback) => {
             const redirectUrl = details.url
                 .replace('localhost:8000', `localhost:${backendPort}`)
@@ -322,9 +329,9 @@ app.whenReady().then(() => {
         if (activeTabId && browserViews[activeTabId]) {
             mainWindow.removeBrowserView(browserViews[activeTabId]);
         }
-        
+
         activeTabId = tabId;
-        
+
         if (activeTabId && browserViews[activeTabId]) {
             const view = browserViews[activeTabId];
             mainWindow.setBrowserView(view);
@@ -399,7 +406,7 @@ app.whenReady().then(() => {
             const view = browserViews[activeTabId];
             if (bounds.visible) {
                 mainWindow.setBrowserView(view);
-                
+
                 const { screen } = require('electron');
                 const winBounds = mainWindow.getBounds();
                 const display = screen.getDisplayMatching(winBounds);
@@ -466,14 +473,14 @@ function discoverBackendPort() {
     return new Promise((resolve) => {
         const http = require('http');
         let portToTry = 8000;
-        
+
         const tryNext = () => {
             if (portToTry > 8009) {
                 console.log('Could not find active manual backend on ports 8000-8009.');
                 resolve(null);
                 return;
             }
-            
+
             const req = http.get(`http://127.0.0.1:${portToTry}/status`, { timeout: 150 }, (res) => {
                 let body = '';
                 res.on('data', chunk => body += chunk);
@@ -484,7 +491,7 @@ function discoverBackendPort() {
                             resolve(portToTry);
                             return;
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                     portToTry++;
                     tryNext();
                 });
@@ -499,7 +506,7 @@ function discoverBackendPort() {
                 tryNext();
             });
         };
-        
+
         tryNext();
     });
 }

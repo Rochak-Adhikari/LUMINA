@@ -30,7 +30,7 @@ Usage:
     container.register_transient(IFoo, lambda: FooImpl())
 
     # Register a pre-built instance directly
-    container.register_instance(ISmartHomeAgent, kasa_agent)
+    container.register_instance(IEventBus, event_bus)
 """
 
 from __future__ import annotations

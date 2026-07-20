@@ -25,12 +25,6 @@ def settings():
 
 
 @pytest.fixture(scope="session")
-def kasa_devices(settings):
-    """Get Kasa devices from settings."""
-    return settings.get("kasa_devices", [])
-
-
-@pytest.fixture(scope="session")
 def printers(settings):
     """Get printers from settings."""
     return settings.get("printers", [])

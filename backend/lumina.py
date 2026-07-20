@@ -42,19 +42,6 @@ load_dotenv()
 client = genai.Client(http_options={"api_version": "v1beta"}, api_key=os.getenv("GEMINI_API_KEY"))
 
 # Function definitions
-generate_cad = {
-    "name": "generate_cad",
-    "description": "Generates a 3D CAD model based on a prompt.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "prompt": {"type": "STRING", "description": "The description of the object to generate."}
-        },
-        "required": ["prompt"]
-    },
-    "behavior": "NON_BLOCKING"
-}
-
 run_web_agent = {
     "name": "run_web_agent",
     "description": "Opens a web browser and performs a task according to the prompt.",
@@ -99,90 +86,6 @@ list_projects_tool = {
         "type": "OBJECT",
         "properties": {},
     }
-}
-
-list_smart_devices_tool = {
-    "name": "list_smart_devices",
-    "description": "Lists all available smart home devices (lights, plugs, etc.) on the network.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-    }
-}
-
-control_light_tool = {
-    "name": "control_light",
-    "description": "Controls a smart light device.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "target": {
-                "type": "STRING",
-                "description": "The IP address of the device to control. Always prefer the IP address over the alias for reliability."
-            },
-            "action": {
-                "type": "STRING",
-                "description": "The action to perform: 'turn_on', 'turn_off', or 'set'."
-            },
-            "brightness": {
-                "type": "INTEGER",
-                "description": "Optional brightness level (0-100)."
-            },
-            "color": {
-                "type": "STRING",
-                "description": "Optional color name (e.g., 'red', 'cool white') or 'warm'."
-            }
-        },
-        "required": ["target", "action"]
-    }
-}
-
-discover_printers_tool = {
-    "name": "discover_printers",
-    "description": "Discovers 3D printers available on the local network.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-    }
-}
-
-print_stl_tool = {
-    "name": "print_stl",
-    "description": "Prints an STL file to a 3D printer. Handles slicing the STL to G-code and uploading to the printer.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "stl_path": {"type": "STRING", "description": "Path to STL file, or 'current' for the most recent CAD model."},
-            "printer": {"type": "STRING", "description": "Printer name or IP address."},
-            "profile": {"type": "STRING", "description": "Optional slicer profile name."}
-        },
-        "required": ["stl_path", "printer"]
-    }
-}
-
-get_print_status_tool = {
-    "name": "get_print_status",
-    "description": "Gets the current status of a 3D printer including progress, time remaining, and temperatures.",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "printer": {"type": "STRING", "description": "Printer name or IP address."}
-        },
-        "required": ["printer"]
-    }
-}
-
-iterate_cad_tool = {
-    "name": "iterate_cad",
-    "description": "Modifies or iterates on the current CAD design based on user feedback. Use this when the user asks to adjust, change, modify, or iterate on the existing 3D model (e.g., 'make it taller', 'add a handle', 'reduce the thickness').",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "prompt": {"type": "STRING", "description": "The changes or modifications to apply to the current design."}
-        },
-        "required": ["prompt"]
-    },
-    "behavior": "NON_BLOCKING"
 }
 
 # NOTE: run_web_agent REMOVED — Web Agent is disabled in this build.
@@ -245,7 +148,7 @@ config = types.LiveConnectConfig(
     "- ACTIONS: Web Search, Browser Control (headless browser automation), File Processor (deep AI analysis on PDFs, Images, CSVs, Audio/Video files), File Controller (folder/file CRUD operations), Dev Agent (automatic multi-file project setup), Flight Finder (google flights scraper), Game Updater (Steam/Epic games scheduler), Send Messages (WhatsApp/Discord/Email/SMS composition), Reminders & Alarms (alarm popups), Spotify Control (playback controls), YouTube Control.\n"
     "- SYSTEM: Computer Control (mouse/keyboard simulation), Computer Settings (brightness/volume/wifi), Open Applications, Screen Processor (desktops screenshot OCR analysis), Desktop Control (windows sizing/virtual desktops), Command Line Control (CMD/PowerShell scripts execution).\n"
     "- REMOTE: Remote Phone Dashboard (LAN dashboard, stream phone microphone, mobile upload dropzone).\n"
-    "- CREATIVE/IOT: CAD Design Agent (OpenSCAD 3D models generation), Smart Home (TP-Link Kasa lights/plugs control), 3D Printer Control (OctoPrint/Moonraker status & job management).\n\n"
+    "- CREATIVE/IOT: CAD Design Agent (OpenSCAD 3D models generation), 3D Printer Control (OctoPrint/Moonraker status & job management).\n\n"
     "LUMINA BROWSER ARCHITECTURE:\n"
     "Lumina has a single dedicated Brave browser instance — completely separate from the user's personal Brave.\n"
     "Profile: E:\\LuminaBrowser\\profile | Port: 9223 | Window: 1100x700\n"
@@ -354,15 +257,12 @@ config = types.LiveConnectConfig(
 
 pya = pyaudio.PyAudio()
 
-from cad_agent import CadAgent
 from web_agent import WebAgent
-from kasa_agent import KasaAgent
-from printer_agent import PrinterAgent
 from memory_store import MemoryStore
 from persona_engine import get_persona_engine
 
 class AudioLoop:
-    def __init__(self, video_mode=DEFAULT_MODE, on_audio_data=None, on_video_frame=None, on_cad_data=None, on_web_data=None, on_transcription=None, on_tool_confirmation=None, on_cad_status=None, on_cad_thought=None, on_project_update=None, on_device_update=None, on_error=None, on_model_status=None, input_device_index=None, input_device_name=None, output_device_index=None, kasa_agent=None, memory_store=None, project_manager=None):
+    def __init__(self, video_mode=DEFAULT_MODE, on_audio_data=None, on_video_frame=None, on_cad_data=None, on_web_data=None, on_transcription=None, on_tool_confirmation=None, on_cad_status=None, on_cad_thought=None, on_project_update=None, on_device_update=None, on_error=None, on_model_status=None, input_device_index=None, input_device_name=None, output_device_index=None, memory_store=None, project_manager=None):
         self.video_mode = video_mode
         self.on_audio_data = on_audio_data
         self.on_video_frame = on_video_frame
@@ -396,21 +296,10 @@ class AudioLoop:
         self.paused = False
 
         self.session = None
-        
-        # Create CadAgent with thought callback
-        def handle_cad_thought(thought_text):
-            if self.on_cad_thought:
-                self.on_cad_thought(thought_text)
-        
-        def handle_cad_status(status_info):
-            if self.on_cad_status:
-                self.on_cad_status(status_info)
-        
-        self.cad_agent = CadAgent(on_thought=handle_cad_thought, on_status=handle_cad_status)
+
+        self.cad_agent = None  # CAD runtime removed (Phase 9.0.6)
         # WebAgent kept for future use but NOT auto-spawned
         self.web_agent = None  # Disabled: WebAgent()
-        self.kasa_agent = kasa_agent if kasa_agent else KasaAgent()
-        self.printer_agent = PrinterAgent()
         self._facade = RuntimeFacade(container)
 
         self.send_text_task = None
@@ -886,69 +775,6 @@ class AudioLoop:
                 print(f"Error reading audio: {e}")
                 await asyncio.sleep(0.1)
 
-    async def handle_cad_request(self, prompt):
-        print(f"[LUMINA DEBUG] [CAD] Background Task Started: handle_cad_request('{prompt}')")
-        if self.on_cad_status:
-            self.on_cad_status("generating")
-            
-        # Auto-create project if stuck in temp
-        if self.project_manager.current_project == "temp":
-            import datetime
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            new_project_name = f"Project_{timestamp}"
-            print(f"[LUMINA DEBUG] [CAD] Auto-creating project: {new_project_name}")
-            
-            success, msg = self.project_manager.create_project(new_project_name)
-            if success:
-                self.project_manager.switch_project(new_project_name)
-                # Notify User (Optional, or rely on update)
-                try:
-                    await self.session.send(input=f"System Notification: Automatic Project Creation. Switched to new project '{new_project_name}'.", end_of_turn=False)
-                    if self.on_project_update:
-                         self.on_project_update(new_project_name)
-                except Exception as e:
-                    print(f"[LUMINA DEBUG] [ERR] Failed to notify auto-project: {e}")
-
-        # Get project cad folder path
-        cad_output_dir = str(self.project_manager.get_current_project_path() / "cad")
-        
-        # Call the secondary agent with project path
-        cad_data = await self.cad_agent.generate_prototype(prompt, output_dir=cad_output_dir)
-        
-        if cad_data:
-            print(f"[LUMINA DEBUG] [OK] CadAgent returned data successfully.")
-            print(f"[LUMINA DEBUG] [INFO] Data Check: {len(cad_data.get('vertices', []))} vertices, {len(cad_data.get('edges', []))} edges.")
-            
-            if self.on_cad_data:
-                print(f"[LUMINA DEBUG] [SEND] Dispatching data to frontend callback...")
-                self.on_cad_data(cad_data)
-                print(f"[LUMINA DEBUG] [SENT] Dispatch complete.")
-            
-            # Save to Project
-            if 'file_path' in cad_data:
-                self.project_manager.save_cad_artifact(cad_data['file_path'], prompt)
-            else:
-                 # Fallback (legacy support)
-                 self.project_manager.save_cad_artifact("output.stl", prompt)
-
-            # Notify the model that the task is done - this triggers speech about completion
-            completion_msg = "System Notification: CAD generation is complete! The 3D model is now displayed for the user. Let them know it's ready."
-            try:
-                await self.session.send(input=completion_msg, end_of_turn=True)
-                print(f"[LUMINA DEBUG] [NOTE] Sent completion notification to model.")
-            except Exception as e:
-                 print(f"[LUMINA DEBUG] [ERR] Failed to send completion notification: {e}")
-
-        else:
-            print(f"[LUMINA DEBUG] [ERR] CadAgent returned None.")
-            # Optionally notify failure
-            try:
-                await self.session.send(input="System Notification: CAD generation failed.", end_of_turn=True)
-            except Exception:
-                pass
-
-
-
     async def handle_write_file(self, path, content):
         print(f"[LUMINA DEBUG] [FS] Writing file: '{path}'")
         
@@ -1215,8 +1041,6 @@ class AudioLoop:
                                 # also include standard tools that should auto-run when permitted:
                                 "write_file", "read_directory", "read_file",
                                 "create_project", "switch_project", "list_projects",
-                                "list_smart_devices", "control_light", "discover_printers",
-                                "print_stl", "get_print_status", "iterate_cad", "generate_cad",
                                 "browser_control", "local_browser_control",
                                 "spotify_control",
                             }

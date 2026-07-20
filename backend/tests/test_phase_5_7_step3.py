@@ -54,7 +54,7 @@ class TestReflectionDI(unittest.TestCase):
 
     def test_skill_registry_unchanged(self):
         from brain.skills.registry import SkillRegistry
-        self.assertEqual(len(self.container.resolve(SkillRegistry)), 19)
+        self.assertEqual(len(self.container.resolve(SkillRegistry)), 12)
 
 
 class TestDormancy(unittest.TestCase):

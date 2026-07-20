@@ -574,7 +574,7 @@ class TestOrder7_BrainCoreOrchestration(unittest.TestCase):
         self.assertEqual(len(self.container.resolve(ServiceMetadataRegistry)), 11)
 
     def test_skill_registry_still_19(self):
-        self.assertEqual(len(self.container.resolve(SkillRegistry)), 19)
+        self.assertEqual(len(self.container.resolve(SkillRegistry)), 12)
 
     def test_plannable_request_declines_when_executor_unbound(self):
         core = self.container.resolve(IBrainCore)

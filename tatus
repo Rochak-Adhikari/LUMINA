@@ -1,0 +1,22 @@
+warning: in the working copy of 'backend/brain/skills/builtin.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/tests/test_phase_5_4.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/tests/test_phase_5_6_step4.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/tests/test_phase_5_7_step3.py', LF will be replaced by CRLF the next time Git touches it
+ backend/brain/skills/builtin.py       |  12 [31m--[m
+ backend/core/__init__.py              |   2 [31m-[m
+ backend/core/bootstrap.py             |  11 [32m+[m[31m-[m
+ backend/core/container.py             |   2 [32m+[m[31m-[m
+ backend/core/interfaces.py            |  38 [31m------[m
+ backend/core/tool_handlers.py         |  66 [31m----------[m
+ backend/kasa_agent.py                 | 221 [31m----------------------------------[m
+ backend/lumina.py                     |  44 [32m+[m[31m------[m
+ backend/server.py                     | 112 [32m+[m[31m----------------[m
+ backend/tests/conftest.py             |   6 [31m-[m
+ backend/tests/test_kasa_agent.py      | 187 [31m----------------------------[m
+ backend/tests/test_lumina_tools.py    |  27 [32m+[m[31m----[m
+ backend/tests/test_phase_5_4.py       |   2 [32m+[m[31m-[m
+ backend/tests/test_phase_5_6_step4.py |   2 [32m+[m[31m-[m
+ backend/tests/test_phase_5_7_step3.py |   2 [32m+[m[31m-[m
+ backend/tests/test_runner.py          |   3 [32m+[m[31m-[m
+ electron/main.js                      |  18 [32m+[m[31m--[m
+ 17 files changed, 21 insertions(+), 734 deletions(-)
