@@ -362,6 +362,228 @@ class Bootstrapper:
         print("[DI] RecommendationEngine registered (dormant)")
 
         self._register_skill_creator()
+        self._register_skill_runtime()
+
+    def _register_skill_runtime(self) -> None:
+        """
+        Phase 8.1: Registry Discovery — the first runtime consumer of the frozen
+        Phase 7 registry. Read-only; answers "what skills exist?" by projecting
+        RegistryEntry into DiscoveredSkill. No runtime path wires into it yet
+        (dormant); registered here so the Planner can later resolve it via DI
+        instead of importing skills directly.
+        """
+        from brain.skill_runtime.interfaces import IRegistryDiscovery
+        from brain.skill_runtime.registry_discovery import RegistryDiscovery
+
+        self.registry_discovery = RegistryDiscovery(self.blueprint_registry)
+        self._container.register_instance(IRegistryDiscovery, self.registry_discovery)
+        self._container.register_instance(RegistryDiscovery, self.registry_discovery)
+        print("[DI] RegistryDiscovery registered (dormant)")
+
+        self._register_capability_matcher()
+
+    def _register_capability_matcher(self) -> None:
+        """
+        Phase 8.2: Capability Matching — semantic layer over Registry Discovery.
+        Answers "which skills satisfy this capability?" Depends only on
+        IRegistryDiscovery; pure and deterministic. Dormant — no runtime path
+        wires into it yet.
+        """
+        from brain.skill_runtime.interfaces import ICapabilityMatcher
+        from brain.skill_runtime.capability_matcher import CapabilityMatcher
+
+        self.capability_matcher = CapabilityMatcher(self.registry_discovery)
+        self._container.register_instance(ICapabilityMatcher, self.capability_matcher)
+        self._container.register_instance(CapabilityMatcher, self.capability_matcher)
+        print("[DI] CapabilityMatcher registered (dormant)")
+
+        self._register_dependency_resolver()
+
+    def _register_dependency_resolver(self) -> None:
+        """
+        Phase 8.3: Dependency Resolution — the gate between matching and loading.
+        Selects the top-ranked match whose dependencies are satisfied. Depends
+        only on Phase 8.2 output + supplied grants; pure and deterministic.
+        Dormant — no runtime path wires into it yet.
+        """
+        from brain.skill_runtime.interfaces import IDependencyResolver
+        from brain.skill_runtime.dependency_resolver import DependencyResolver
+
+        self.dependency_resolver = DependencyResolver()
+        self._container.register_instance(IDependencyResolver, self.dependency_resolver)
+        self._container.register_instance(DependencyResolver, self.dependency_resolver)
+        print("[DI] DependencyResolver registered (dormant)")
+
+        self._register_skill_sandbox()
+
+    def _register_skill_sandbox(self) -> None:
+        """
+        Phase 8.4: Skill Sandbox — first runtime execution-safety layer. Pure
+        allow/deny gatekeeper over a DependencyResolution + SandboxPolicy. Never
+        loads or executes. Depends only on Phase 8.3 output. Dormant.
+        """
+        from brain.skill_runtime.interfaces import ISkillSandbox
+        from brain.skill_runtime.skill_sandbox import SkillSandbox
+
+        self.skill_sandbox = SkillSandbox()
+        self._container.register_instance(ISkillSandbox, self.skill_sandbox)
+        self._container.register_instance(SkillSandbox, self.skill_sandbox)
+        print("[DI] SkillSandbox registered (dormant)")
+
+        self._register_skill_loader()
+
+    def _register_skill_loader(self) -> None:
+        """
+        Phase 8.5: Skill Loader — turns an approved SandboxDecision into a loaded,
+        validated skill instance (import + instantiate + interface check). Never
+        executes. Depends only on Phase 8.4 output. Dormant.
+        """
+        from brain.skill_runtime.interfaces import ISkillLoader
+        from brain.skill_runtime.skill_loader import SkillLoader
+
+        self.skill_loader = SkillLoader()
+        self._container.register_instance(ISkillLoader, self.skill_loader)
+        self._container.register_instance(SkillLoader, self.skill_loader)
+        print("[DI] SkillLoader registered (dormant)")
+
+        self._register_skill_executor()
+
+    def _register_skill_executor(self) -> None:
+        """
+        Phase 8.6: Skill Executor — runs a LoadedSkill exactly once via its
+        canonical run(context). Never retries/recovers/chains; converts failures
+        into structured ExecutionResult. Depends only on Phase 8.5 output. Dormant.
+        """
+        from brain.skill_runtime.interfaces import ISkillExecutor
+        from brain.skill_runtime.skill_executor import SkillExecutor
+
+        self.skill_executor = SkillExecutor()
+        self._container.register_instance(ISkillExecutor, self.skill_executor)
+        self._container.register_instance(SkillExecutor, self.skill_executor)
+        print("[DI] SkillExecutor registered (dormant)")
+
+        self._register_context_injector()
+
+    def _register_context_injector(self) -> None:
+        """
+        Phase 8.7: Context Injection — pure builder of an immutable
+        ExecutionContext from a LoadedSkill + caller data. Never loads/executes/
+        accesses services. Depends only on Phase 8.5 output. Dormant.
+        """
+        from brain.skill_runtime.interfaces import IContextInjector
+        from brain.skill_runtime.context_injector import ContextInjector
+
+        self.context_injector = ContextInjector()
+        self._container.register_instance(IContextInjector, self.context_injector)
+        self._container.register_instance(ContextInjector, self.context_injector)
+        print("[DI] ContextInjector registered (dormant)")
+
+        self._register_execution_observer()
+
+    def _register_execution_observer(self) -> None:
+        """
+        Phase 8.8: Execution Observer — purely observational. Converts an
+        ExecutionResult into an immutable ExecutionObservation. Never executes,
+        retries, or mutates. Depends only on ExecutionResult. Dormant.
+        """
+        from brain.skill_runtime.interfaces import IExecutionObserver
+        from brain.skill_runtime.execution_observer import ExecutionObserver
+
+        self.execution_observer = ExecutionObserver()
+        self._container.register_instance(IExecutionObserver, self.execution_observer)
+        self._container.register_instance(ExecutionObserver, self.execution_observer)
+        print("[DI] ExecutionObserver registered (dormant)")
+
+        self._register_execution_recorder()
+
+    def _register_execution_recorder(self) -> None:
+        """
+        Phase 8.9: Execution Recorder — pure transformation of an
+        ExecutionObservation into a persistence-ready ExecutionRecord. Does NOT
+        persist/log/save. Depends only on the observation. Dormant.
+        """
+        from brain.skill_runtime.interfaces import IExecutionRecorder
+        from brain.skill_runtime.execution_recorder import ExecutionRecorder
+
+        self.execution_recorder = ExecutionRecorder()
+        self._container.register_instance(IExecutionRecorder, self.execution_recorder)
+        self._container.register_instance(ExecutionRecorder, self.execution_recorder)
+        print("[DI] ExecutionRecorder registered (dormant)")
+
+        self._register_execution_persistence()
+
+    def _register_execution_persistence(self) -> None:
+        """
+        Phase 8.10: Execution Persistence — prepare step (NOT storage). Wraps an
+        ExecutionRecord into a PersistenceResult; stores nothing. Depends only on
+        the record. Dormant.
+        """
+        from brain.skill_runtime.interfaces import IExecutionPersistence
+        from brain.skill_runtime.execution_persistence import ExecutionPersistence
+
+        self.execution_persistence = ExecutionPersistence()
+        self._container.register_instance(IExecutionPersistence, self.execution_persistence)
+        self._container.register_instance(ExecutionPersistence, self.execution_persistence)
+        print("[DI] ExecutionPersistence registered (dormant)")
+
+        self._register_runtime_pipeline()
+
+    def _register_runtime_pipeline(self) -> None:
+        """
+        Phase 8.11: Runtime Pipeline Orchestrator — coordinates the ten runtime
+        stages in order (discovery → … → persistence) into a RuntimePipelineResult.
+        Pure coordination, no business logic; stages constructor-injected. Dormant.
+        """
+        from brain.skill_runtime.interfaces import IRuntimePipeline
+        from brain.skill_runtime.runtime_pipeline import RuntimePipeline
+
+        self.runtime_pipeline = RuntimePipeline(
+            self.registry_discovery,
+            self.capability_matcher,
+            self.dependency_resolver,
+            self.skill_sandbox,
+            self.skill_loader,
+            self.context_injector,
+            self.skill_executor,
+            self.execution_observer,
+            self.execution_recorder,
+            self.execution_persistence,
+        )
+        self._container.register_instance(IRuntimePipeline, self.runtime_pipeline)
+        self._container.register_instance(RuntimePipeline, self.runtime_pipeline)
+        print("[DI] RuntimePipeline registered (dormant)")
+
+        self._register_failure_recovery()
+
+    def _register_failure_recovery(self) -> None:
+        """
+        Phase 8.12: Failure Recovery — descriptive advisor over a
+        RuntimePipelineResult, producing a RecoveryPlan. Names WHAT recovery
+        should happen; acts on nothing. Pure/deterministic. Dormant.
+        """
+        from brain.skill_runtime.interfaces import IFailureRecovery
+        from brain.skill_runtime.failure_recovery import FailureRecovery
+
+        self.failure_recovery = FailureRecovery()
+        self._container.register_instance(IFailureRecovery, self.failure_recovery)
+        self._container.register_instance(FailureRecovery, self.failure_recovery)
+        print("[DI] FailureRecovery registered (dormant)")
+
+        self._register_runtime_validator()
+
+    def _register_runtime_validator(self) -> None:
+        """
+        Phase 8.13: Runtime Validation — read-only integrity checker over a
+        RuntimePipelineResult, producing a ValidationReport. Asserts structural
+        consistency; repairs/mutates nothing. Pure/deterministic. Dormant.
+        """
+        from brain.skill_runtime.interfaces import IRuntimeValidator
+        from brain.skill_runtime.runtime_validation import RuntimeValidator
+
+        self.runtime_validator = RuntimeValidator()
+        self._container.register_instance(IRuntimeValidator, self.runtime_validator)
+        self._container.register_instance(RuntimeValidator, self.runtime_validator)
+        print("[DI] RuntimeValidator registered (dormant)")
 
     def _register_skill_creator(self) -> None:
         """

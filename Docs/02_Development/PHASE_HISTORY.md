@@ -152,4 +152,80 @@ timeline
 - **Verification**: `test_phase_7_step1..11` (+step2_5/2_6) — 214 PASS; full
   Phase 5+6+7 regression **694 PASS**. Status: COMPLETE · VALIDATED · FROZEN.
 
+### Phase 8 — Skill Runtime (IN PROGRESS)
+- **Goal**: Consume the immutable artifacts Phase 7 produces — discover, match,
+  resolve, sandbox, load, and execute installed skills. Never modifies Phase 7,
+  never bypasses the Registry: every flow begins from a `RegistryEntry`.
+  > Note: re-scopes the roadmap's reserved "Phase 8.0 — Autonomous Planning"
+  > label to Skill Runtime per owner directive (see ADR-0014).
+- **Milestones**:
+  - **8.1** Registry Discovery — `RegistryDiscovery` (`IRegistryDiscovery`) →
+    `RegistrySearchResult`. Read-only, deterministic projection of the registry
+    into `DiscoveredSkill` records; duck-typed over `.entries()` (no Phase-7
+    import). Dormant in DI + `RuntimeFacade.registry_discovery`. **COMPLETE.**
+  - **8.2** Capability Matching — `CapabilityMatcher` (`ICapabilityMatcher`) →
+    `CapabilityMatchResult`. Semantic layer; depends only on `IRegistryDiscovery`.
+    Deterministic scoring (exact 100 / alias 80 / tag 60), family+package
+    filters. Dormant + `RuntimeFacade.capability_matcher`. **COMPLETE.**
+  - **8.3** Dependency Resolution — `DependencyResolver` (`IDependencyResolver`) →
+    `DependencyResolution`. Gate before loading; selects top satisfiable match.
+    Depends only on 8.2 output + grants. Dormant + `RuntimeFacade.dependency_resolver`.
+    **COMPLETE.**
+  - **8.4** Skill Sandbox — `SkillSandbox` (`ISkillSandbox`) → `SandboxDecision`.
+    First execution-safety layer; pure allow/deny gatekeeper over
+    `DependencyResolution` + `SandboxPolicy`. Dormant + `RuntimeFacade.skill_sandbox`.
+    **COMPLETE.**
+  - **8.5** Skill Loader — `SkillLoader` (`ISkillLoader`) → `LoadedSkill`. Imports
+    + instantiates + validates the installed skill's `Skill`/entrypoint. Never
+    executes. Depends only on Phase 8.4 output. Dormant + `RuntimeFacade.skill_loader`.
+    **COMPLETE.**
+  - **8.6** Skill Executor — `SkillExecutor` (`ISkillExecutor`) → `ExecutionResult`.
+    Runs a loaded skill once via canonical `run(context)`; failure-safe. Depends
+    only on Phase 8.5 output. Dormant + `RuntimeFacade.skill_executor`. Also
+    standardized the runtime entrypoint to `run` (legacy `execute` shim). **COMPLETE.**
+  - **8.7** Context Injection — `ContextInjector` (`IContextInjector`) →
+    `ContextInjectionResult` wrapping frozen `ExecutionContext`. Pure builder;
+    inputs never mutated; no execution/registry/memory. Depends only on Phase 8.5
+    output + caller data. Dormant + `RuntimeFacade.context_injector`. **COMPLETE.**
+  - **8.8** Execution Observer — `ExecutionObserver` (`IExecutionObserver`) →
+    `ExecutionObservation`. Purely observational; depends only on ExecutionResult;
+    deterministic (caller-supplied timestamp). Dormant + `RuntimeFacade.execution_observer`.
+    **COMPLETE.**
+  - **8.9** Execution Recorder — `ExecutionRecorder` (`IExecutionRecorder`) →
+    `ExecutionRecord`. Pure transformation; no persistence. Depends only on the
+    observation; metadata deep-copied, timestamp caller-supplied. Dormant +
+    `RuntimeFacade.execution_recorder`. **COMPLETE.**
+  - **8.10** Execution Persistence — `ExecutionPersistence` (`IExecutionPersistence`)
+    → `PersistenceResult`. Prepare step (NOT storage); wraps a record for future
+    persistence. Depends only on the record; storage_key caller-supplied. Dormant
+    + `RuntimeFacade.execution_persistence`. **COMPLETE.**
+  - **8.11** Runtime Pipeline Orchestrator — `RuntimePipeline` (`IRuntimePipeline`)
+    → `RuntimePipelineResult`. First component that understands the full chain;
+    coordinates stages 11–20 in order, fail-fast, pure coordinator (no business
+    logic/mutation/IO). Stage services constructor-injected. Dormant +
+    `RuntimeFacade.runtime_pipeline`. **COMPLETE.**
+  - **8.12** Failure Recovery — `FailureRecovery` (`IFailureRecovery`) →
+    `RecoveryPlan`. First component that reasons about a failed run; maps the
+    pipeline `reason` to a descriptive recovery strategy/retryable/rationale.
+    Descriptive only (decides WHAT, performs nothing — never retries/re-invokes/
+    executes/loops/mutates). Deterministic; depends only on the result. Dormant +
+    `RuntimeFacade.failure_recovery`. **COMPLETE.**
+  - **8.13** Runtime Validation — `RuntimeValidator` (`IRuntimeValidator`) →
+    `ValidationReport`. First component that asserts a result's structural
+    integrity: contiguity (gap-free stage prefix), completion (completed iff all
+    stages populated + empty reason), reason match (failed reason ↔ last stage).
+    Read-only (checks/reports, never repairs/re-runs/mutates/executes).
+    Deterministic; depends only on the result. Dormant +
+    `RuntimeFacade.runtime_validator`. **COMPLETE.**
+  - **Validation & Freeze** — subsystem-wide gate: 13 interfaces registered (one
+    impl each, facade-reachable singletons), all models frozen, AST boundaries
+    enforced across every stage, determinism + dormancy asserted. Skill Runtime
+    marked **COMPLETE · VALIDATED · FROZEN** (ADR-0027,
+    `tests/test_phase_8_freeze.py`).
+- **Files**: `backend/brain/skill_runtime/*`, `backend/core/bootstrap.py`,
+  `backend/core/runtime_facade.py`; `Docs/TRUTH/pipeline/11–24`, ADR-0014–0027.
+- **Verification**: `test_phase_8_step1..13` + `test_phase_8_freeze` — 219 PASS;
+  full Phase 5+6+7+8 regression **913 PASS**. Status (8.1–8.13):
+  **COMPLETE · VALIDATED · FROZEN**.
+
 See `Docs/04_Guides/FEATURE_GUIDE.md` for how each subsystem works.

@@ -215,8 +215,20 @@ dormant in DI (no runtime consumer yet — that is Phase 8, the Skill Runtime).
 - Phase 6 (Evolution Engine): **COMPLETE · VALIDATED · FROZEN**.
 - Phase 7 (Skill Creator): **COMPLETE · VALIDATED · FROZEN** — 10-stage pipeline
   consuming `EvolutionRecommendationSet`, dormant in DI.
-- Phase 8 (Skill Runtime): **NOT STARTED** — will consume `RegistryEntry` to use
-  created skills.
+- Phase 8 (Skill Runtime): **COMPLETE · VALIDATED · FROZEN** — consumes
+  `RegistryEntry` to use created skills. **8.1–8.13 + Validation & Freeze**
+  (…Persistence, Runtime Pipeline Orchestrator, Failure Recovery, Runtime
+  Validation): `RegistryDiscovery` projects the
+  frozen registry into read-only `DiscoveredSkill` records; `CapabilityMatcher`
+  ranks them semantically (exact 100 / alias 80 / tag 60) depending only on
+  `IRegistryDiscovery`; `RuntimePipeline` (8.11) coordinates all ten stages
+  (discovery → … → persistence) as a pure fail-fast coordinator; `FailureRecovery`
+  (8.12) turns a failed `RuntimePipelineResult` into a descriptive `RecoveryPlan`
+  (decides WHAT to recover, performs nothing); `RuntimeValidator` (8.13) asserts
+  the result's structural integrity into a `ValidationReport` (checks, repairs
+  nothing). All via `RuntimeFacade` (`registry_discovery`, `capability_matcher`,
+  …, `runtime_pipeline`, `failure_recovery`, `runtime_validator`), dormant in DI;
+  runtime byte-identical.
 
-Test coverage: full Phase 5 + 6 + 7 regression suite passing (**694 tests**;
-214 Phase 7).
+Test coverage: full Phase 5 + 6 + 7 + 8 regression suite passing (**913 tests**;
+214 Phase 7, 219 Phase 8).

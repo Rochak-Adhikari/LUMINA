@@ -138,14 +138,31 @@ each). See `Docs/TRUTH/pipeline/01–10` and ADR-0009–0013.
 
 ### Phase 8.0 — Autonomous Planning
 
-**Status: NOT STARTED**
+**Status: COMPLETE · VALIDATED · FROZEN**
 
-- Long-horizon Goals
-- Multi-step Execution
-- Self Scheduling
-- Autonomous Project Completion
-- Continuous Planning
-- Validation & Freeze
+> **Owner re-scope (2026-07-20, ADR-0014):** Phase 8 is being executed as
+> **Skill Runtime** — the consumer of the immutable Phase 7 artifacts (discover,
+> match, resolve, sandbox, load, execute installed skills). The heading is
+> preserved per Roadmap Governance rule #3 (no rename); the scope below records
+> the approved owner directive. Autonomous-planning capabilities are subsumed by
+> the runtime's planner-facing services (discovery → matching → chaining).
+
+Skill Runtime milestones:
+
+- **8.1 Registry Discovery — COMPLETE** (`brain/skill_runtime`, dormant).
+- **8.2 Capability Matching — COMPLETE** (`brain/skill_runtime`, dormant).
+- **8.3 Dependency Resolution — COMPLETE** (`brain/skill_runtime`, dormant).
+- **8.4 Skill Sandbox — COMPLETE** (`brain/skill_runtime`, dormant).
+- **8.5 Skill Loader — COMPLETE** (`brain/skill_runtime`, dormant).
+- **8.6 Skill Executor — COMPLETE** (`brain/skill_runtime`, dormant).
+- **8.7 Runtime Context Injection — COMPLETE** (`brain/skill_runtime`, dormant).
+- **8.8 Execution Observer — COMPLETE** (`brain/skill_runtime`, dormant; Failure Recovery scope narrowed to observation per ADR-0021).
+- **8.9 Execution Recorder — COMPLETE** (`brain/skill_runtime`, dormant; Version Resolution reserved for a later step).
+- **8.10 Execution Persistence — COMPLETE** (`brain/skill_runtime`, dormant; prepare-only, storage deferred).
+- **8.11 Runtime Pipeline Orchestrator — COMPLETE** (`brain/skill_runtime`, dormant; pure coordinator over stages 11–20, ADR-0024).
+- **8.12 Failure Recovery — COMPLETE** (`brain/skill_runtime`, dormant; descriptive `RuntimePipelineResult` → `RecoveryPlan` advisor, decides WHAT without acting, ADR-0025).
+- **8.13 Runtime Validation — COMPLETE** (`brain/skill_runtime`, dormant; read-only `RuntimePipelineResult` → `ValidationReport` integrity checker, asserts consistency without repairing, ADR-0026).
+- **Validation & Freeze — COMPLETE** (subsystem-wide gate: 13 interfaces/impls, frozen models, AST boundaries, determinism, dormancy; Skill Runtime marked COMPLETE · VALIDATED · FROZEN, ADR-0027).
 
 ---
 

@@ -40,7 +40,8 @@ The backend application follows a clean, decoupled dependency-injected design:
 > Phase numbering below follows the authoritative engineering roadmap
 > (`Docs/TRUTH/ENGINEERING_ROADMAP.md`). Phases 1–4 = runtime foundation;
 > Phase 5 = Cognitive Architecture; Phase 6 = Evolution Engine; Phase 7 = Skill
-> Creator. Total test suite: **694 passing** (Phase 7: 214).
+> Creator; Phase 8 = Skill Runtime (in progress). Total test suite:
+> **913 passing** (Phase 7: 214, Phase 8: 219).
 
 | Stage / Phase | Focus | Status | Notes |
 | :--- | :--- | :--- | :--- |
@@ -51,17 +52,19 @@ The backend application follows a clean, decoupled dependency-injected design:
 | **Phase 5** | Cognitive Architecture | ✅ **COMPLETE · FROZEN** | BrainCore, Planning (Rule/LLM/Chain), Skills, Capability Layer, Workspace Memory, Reflection Engine, Workspace Activation, Workspace Reasoning (`backend/brain/core`, `brain/planning`, `brain/skills`, `brain/workspace`, `brain/reflection`). |
 | **Phase 6** | Evolution Engine | ✅ **COMPLETE · FROZEN** | Analysis-only, dormant: Observer→Store→StrategyEvaluator→PerformanceAnalyzer + MemoryConsolidator → RecommendationEngine (`backend/brain/evolution`). |
 | **Phase 7** | Skill Creator | ✅ **COMPLETE · FROZEN** | Deterministic 10-stage pipeline (Builder→Verifier→Generator→Tester→Approver→Installer→Registry→Lifecycle→Marketplace→Rollback) in `backend/brain/skill_creator`; all dormant in DI. See `Docs/TRUTH/pipeline/*` + ADR-0009–0013. |
-| **Phase 8** | Autonomous Planning / Skill Runtime | ❌ Not Started | **Next Phase.** Runtime that consumes RegistryEntry to use created skills. |
+| **Phase 8** | Skill Runtime | ✅ **COMPLETE · VALIDATED · FROZEN** | Runtime that consumes `RegistryEntry` to use created skills. **8.1–8.13 COMPLETE + Validation & Freeze** (…Runtime Pipeline Orchestrator, Failure Recovery, Runtime Validation) (`brain/skill_runtime`, dormant in DI, facade accessors; ADR-0014–0027, pipeline/11–24). |
 
 ---
 
 ## Immediate Priorities
 
-**Phases 5, 6, and 7 are complete and frozen.** Next is **Phase 8** (Skill
-Runtime — consuming installed/registered skills). Documentation is being
-synchronized to match the implemented state. The runtime core (DI, EventBus,
+**Phases 5, 6, and 7 are complete and frozen.** **Phase 8** (Skill Runtime —
+consuming installed/registered skills) is **COMPLETE · VALIDATED · FROZEN**:
+**8.1–8.13 plus Validation & Freeze** (dormant, runtime byte-identical);
+runtime core (DI, EventBus,
 pipeline, RuntimeFacade) remains frozen — new capabilities register through
-Bootstrapper as dormant services, never through new globals.
+Bootstrapper as dormant services, never through new globals. Future runtime work
+appends after Phase 8.
 
 
 

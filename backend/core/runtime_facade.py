@@ -192,6 +192,126 @@ class RuntimeFacade:
         from brain.reflection.engine import ReflectionEngine
         return self._container.resolve(ReflectionEngine)
 
+    @property
+    def registry_discovery(self) -> Any:
+        """Resolve the registered RegistryDiscovery (Phase 8.1).
+
+        Read-only discovery over the installed-skill registry. Dormant — no
+        runtime path consumes it yet."""
+        from brain.skill_runtime.registry_discovery import RegistryDiscovery
+        return self._container.resolve(RegistryDiscovery)
+
+    @property
+    def capability_matcher(self) -> Any:
+        """Resolve the registered CapabilityMatcher (Phase 8.2).
+
+        Semantic capability matching over discovered skills. Dormant — no
+        runtime path consumes it yet."""
+        from brain.skill_runtime.capability_matcher import CapabilityMatcher
+        return self._container.resolve(CapabilityMatcher)
+
+    @property
+    def dependency_resolver(self) -> Any:
+        """Resolve the registered DependencyResolver (Phase 8.3).
+
+        Deterministic dependency gate over matched skills. Dormant — no runtime
+        path consumes it yet."""
+        from brain.skill_runtime.dependency_resolver import DependencyResolver
+        return self._container.resolve(DependencyResolver)
+
+    @property
+    def skill_sandbox(self) -> Any:
+        """Resolve the registered SkillSandbox (Phase 8.4).
+
+        Pure runtime safety gatekeeper. Dormant — no runtime path consumes it
+        yet."""
+        from brain.skill_runtime.skill_sandbox import SkillSandbox
+        return self._container.resolve(SkillSandbox)
+
+    @property
+    def skill_loader(self) -> Any:
+        """Resolve the registered SkillLoader (Phase 8.5).
+
+        Turns an approved skill into a loaded instance (import + instantiate +
+        validate). Never executes. Dormant — no runtime path consumes it yet."""
+        from brain.skill_runtime.skill_loader import SkillLoader
+        return self._container.resolve(SkillLoader)
+
+    @property
+    def skill_executor(self) -> Any:
+        """Resolve the registered SkillExecutor (Phase 8.6).
+
+        Runs a loaded skill once via its canonical run(context). Dormant — no
+        runtime path consumes it yet."""
+        from brain.skill_runtime.skill_executor import SkillExecutor
+        return self._container.resolve(SkillExecutor)
+
+    @property
+    def context_injector(self) -> Any:
+        """Resolve the registered ContextInjector (Phase 8.7).
+
+        Pure builder of an immutable ExecutionContext. Dormant — no runtime path
+        consumes it yet."""
+        from brain.skill_runtime.context_injector import ContextInjector
+        return self._container.resolve(ContextInjector)
+
+    @property
+    def execution_observer(self) -> Any:
+        """Resolve the registered ExecutionObserver (Phase 8.8).
+
+        Purely observational — ExecutionResult → ExecutionObservation. Dormant —
+        no runtime path consumes it yet."""
+        from brain.skill_runtime.execution_observer import ExecutionObserver
+        return self._container.resolve(ExecutionObserver)
+
+    @property
+    def execution_recorder(self) -> Any:
+        """Resolve the registered ExecutionRecorder (Phase 8.9).
+
+        Pure ExecutionObservation → ExecutionRecord (no persistence). Dormant —
+        no runtime path consumes it yet."""
+        from brain.skill_runtime.execution_recorder import ExecutionRecorder
+        return self._container.resolve(ExecutionRecorder)
+
+    @property
+    def execution_persistence(self) -> Any:
+        """Resolve the registered ExecutionPersistence (Phase 8.10).
+
+        Prepare step for persistence (stores nothing) — ExecutionRecord →
+        PersistenceResult. Dormant — no runtime path consumes it yet."""
+        from brain.skill_runtime.execution_persistence import ExecutionPersistence
+        return self._container.resolve(ExecutionPersistence)
+
+    @property
+    def runtime_pipeline(self) -> Any:
+        """Resolve the registered RuntimePipeline (Phase 8.11).
+
+        Coordinates the ten runtime stages (discovery → … → persistence) into a
+        RuntimePipelineResult. Pure coordinator, no business logic. Dormant — no
+        runtime path consumes it yet."""
+        from brain.skill_runtime.runtime_pipeline import RuntimePipeline
+        return self._container.resolve(RuntimePipeline)
+
+    @property
+    def failure_recovery(self) -> Any:
+        """Resolve the registered FailureRecovery (Phase 8.12).
+
+        Descriptive recovery advisor — RuntimePipelineResult → RecoveryPlan.
+        Names WHAT recovery should happen; acts on nothing. Dormant — no runtime
+        path consumes it yet."""
+        from brain.skill_runtime.failure_recovery import FailureRecovery
+        return self._container.resolve(FailureRecovery)
+
+    @property
+    def runtime_validator(self) -> Any:
+        """Resolve the registered RuntimeValidator (Phase 8.13).
+
+        Read-only integrity checker — RuntimePipelineResult → ValidationReport.
+        Asserts structural consistency; repairs/mutates nothing. Dormant — no
+        runtime path consumes it yet."""
+        from brain.skill_runtime.runtime_validation import RuntimeValidator
+        return self._container.resolve(RuntimeValidator)
+
     # ---- Phase 5.8.2: Workspace Activation ------------------------------
 
     def activate_workspace(self, project_manager: Any) -> Any:
