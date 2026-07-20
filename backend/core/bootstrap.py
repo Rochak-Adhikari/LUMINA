@@ -361,6 +361,123 @@ class Bootstrapper:
         self._container.register_instance(RecommendationEngine, self.recommendation_engine)
         print("[DI] RecommendationEngine registered (dormant)")
 
+        self._register_skill_creator()
+
+    def _register_skill_creator(self) -> None:
+        """
+        Phase 7.2: Register the Skill Creator (dormant).
+
+        BlueprintBuilder is the concrete ISkillCreator: a deterministic
+        transformer of EvolutionRecommendationSet → SkillBlueprintSet (metadata
+        only). It generates no code, installs nothing, touches no runtime. No
+        runtime path consumes it — registration only. Boot byte-identical.
+        """
+        from brain.skill_creator.interfaces import ISkillCreator
+        from brain.skill_creator.blueprint_builder import BlueprintBuilder
+
+        self.blueprint_builder = BlueprintBuilder()
+        self._container.register_instance(ISkillCreator, self.blueprint_builder)
+        self._container.register_instance(BlueprintBuilder, self.blueprint_builder)
+        print("[DI] BlueprintBuilder registered (dormant)")
+
+        # Phase 7.3: BlueprintVerifier (pipeline stage 02) — deterministic
+        # static verification of a SkillBlueprint. No runtime consumer yet.
+        from brain.skill_creator.interfaces import IBlueprintVerifier
+        from brain.skill_creator.blueprint_verifier import BlueprintVerifier
+
+        self.blueprint_verifier = BlueprintVerifier()
+        self._container.register_instance(IBlueprintVerifier, self.blueprint_verifier)
+        self._container.register_instance(BlueprintVerifier, self.blueprint_verifier)
+        print("[DI] BlueprintVerifier registered (dormant)")
+
+        # Phase 7.4: BlueprintGenerator (pipeline stage 03) — deterministic
+        # package descriptor generation from a verified blueprint. Gated on
+        # verification; no filesystem, no execution. No runtime consumer yet.
+        from brain.skill_creator.interfaces import IBlueprintGenerator
+        from brain.skill_creator.blueprint_generator import BlueprintGenerator
+
+        self.blueprint_generator = BlueprintGenerator()
+        self._container.register_instance(IBlueprintGenerator, self.blueprint_generator)
+        self._container.register_instance(BlueprintGenerator, self.blueprint_generator)
+        print("[DI] BlueprintGenerator registered (dormant)")
+
+        # Phase 7.5: BlueprintTester (pipeline stage 04) — deterministic static
+        # testing of a generated package. Gated on generation; no execution, no
+        # filesystem. No runtime consumer yet.
+        from brain.skill_creator.interfaces import IBlueprintTester
+        from brain.skill_creator.blueprint_tester import BlueprintTester
+
+        self.blueprint_tester = BlueprintTester()
+        self._container.register_instance(IBlueprintTester, self.blueprint_tester)
+        self._container.register_instance(BlueprintTester, self.blueprint_tester)
+        print("[DI] BlueprintTester registered (dormant)")
+
+        # Phase 7.6: BlueprintApprover (pipeline stage 05) — mandatory human
+        # gate. Records an explicit human decision over a TestResult; never
+        # auto-approves. Deterministic, no side effects. No runtime consumer yet.
+        from brain.skill_creator.interfaces import IBlueprintApprover
+        from brain.skill_creator.blueprint_approver import BlueprintApprover
+
+        self.blueprint_approver = BlueprintApprover()
+        self._container.register_instance(IBlueprintApprover, self.blueprint_approver)
+        self._container.register_instance(BlueprintApprover, self.blueprint_approver)
+        print("[DI] BlueprintApprover registered (dormant)")
+
+        # Phase 7.7: BlueprintInstaller (pipeline stage 06) — materializes an
+        # approved generated package to disk. Gated on approval; idempotent;
+        # never executes/activates/registers. No runtime consumer yet.
+        from brain.skill_creator.interfaces import IBlueprintInstaller
+        from brain.skill_creator.blueprint_installer import BlueprintInstaller
+
+        self.blueprint_installer = BlueprintInstaller()
+        self._container.register_instance(IBlueprintInstaller, self.blueprint_installer)
+        self._container.register_instance(BlueprintInstaller, self.blueprint_installer)
+        print("[DI] BlueprintInstaller registered (dormant)")
+
+        # Phase 7.8: BlueprintRegistry (pipeline stage 07) — append-only catalog
+        # of installed skills. Gated on installation; never overwrites entries.
+        # No runtime consumer yet.
+        from brain.skill_creator.interfaces import IBlueprintRegistry
+        from brain.skill_creator.blueprint_registry import BlueprintRegistry
+
+        self.blueprint_registry = BlueprintRegistry()
+        self._container.register_instance(IBlueprintRegistry, self.blueprint_registry)
+        self._container.register_instance(BlueprintRegistry, self.blueprint_registry)
+        print("[DI] BlueprintRegistry registered (dormant)")
+
+        # Phase 7.9: LifecycleManager (pipeline stage 08) — append-only lifecycle
+        # event log over registered skills. Never edits registry/prior events.
+        # No runtime consumer yet.
+        from brain.skill_creator.interfaces import ILifecycleManager
+        from brain.skill_creator.lifecycle_manager import LifecycleManager
+
+        self.lifecycle_manager = LifecycleManager()
+        self._container.register_instance(ILifecycleManager, self.lifecycle_manager)
+        self._container.register_instance(LifecycleManager, self.lifecycle_manager)
+        print("[DI] LifecycleManager registered (dormant)")
+
+        # Phase 7.10: MarketplacePublisher (pipeline stage 09) — deterministic
+        # marketplace manifest construction. No networking, no I/O, no mutation.
+        # No runtime consumer yet.
+        from brain.skill_creator.interfaces import IMarketplacePublisher
+        from brain.skill_creator.marketplace_publisher import MarketplacePublisher
+
+        self.marketplace_publisher = MarketplacePublisher()
+        self._container.register_instance(IMarketplacePublisher, self.marketplace_publisher)
+        self._container.register_instance(MarketplacePublisher, self.marketplace_publisher)
+        print("[DI] MarketplacePublisher registered (dormant)")
+
+        # Phase 7.11: RollbackManager (pipeline stage 10, final) — reverses the
+        # installer's filesystem materialization. Deterministic, idempotent;
+        # deletes only installer-created files. No runtime consumer yet.
+        from brain.skill_creator.interfaces import IRollbackManager
+        from brain.skill_creator.rollback_manager import RollbackManager
+
+        self.rollback_manager = RollbackManager()
+        self._container.register_instance(IRollbackManager, self.rollback_manager)
+        self._container.register_instance(RollbackManager, self.rollback_manager)
+        print("[DI] RollbackManager registered (dormant)")
+
     def _register_planning_and_skills(self) -> None:
         """
         Phase 5.2: Register the deterministic planning + skill layer.
