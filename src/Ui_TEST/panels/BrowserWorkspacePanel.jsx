@@ -4,15 +4,47 @@ import Visualizer from '../../components/Visualizer';
 
 const { ipcRenderer } = window.require('electron');
 
-const BrowserWorkspacePanel = ({ socket, aiAudioData, isConnected, isMuted, messages, toggleMute, handleSendClick, handleSendKey, inputValue, setInputValue, messagesEndRef, audioAmp }) => {
+const BrowserWorkspacePanel = ({ socket, openUrl, aiAudioData, isConnected, isMuted, messages, toggleMute, handleSendClick, handleSendKey, inputValue, setInputValue, messagesEndRef, audioAmp }) => {
     const placeholderRef = useRef(null);
+    // Flicker fix: coalesce rapid updateBounds() calls (ResizeObserver + mount
+    // timers + tab/nav effects) into a single rAF-scheduled send, and skip the
+    // IPC entirely when geometry is unchanged. Prevents the BrowserView from
+    // being repositioned 8+ times in a burst on panel open.
+    const boundsRafRef = useRef(0);
+    const lastBoundsRef = useRef(null);
+    // Live refs so the mount-scoped ([]) IPC listeners read current tab state
+    // without a stale closure (crash/stale recovery needs the latest URL).
+    const tabsRef = useRef(null);
+    const activeTabIdRef = useRef(null);
 
-    // Tab State
-    const [tabs, setTabs] = useState([
-        { id: 'tab-default', title: 'Google', url: 'https://www.google.com', loading: false, favicon: null }
-    ]);
-    const [activeTabId, setActiveTabId] = useState('tab-default');
-    const [inputUrl, setInputUrl] = useState('https://www.google.com');
+    // Tab State — persisted across restarts (restore tabs + active tab + URLs).
+    const [tabs, setTabs] = useState(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('lumina_browser_tabs'));
+            if (Array.isArray(saved) && saved.length) {
+                // reset transient loading flags on restore
+                return saved.map(t => ({ ...t, loading: false }));
+            }
+        } catch { /* fall through to default */ }
+        return [{ id: 'tab-default', title: 'Google', url: 'https://www.google.com', loading: false, favicon: null }];
+    });
+    const [activeTabId, setActiveTabId] = useState(() => {
+        try {
+            const saved = localStorage.getItem('lumina_browser_active_tab');
+            const savedTabs = JSON.parse(localStorage.getItem('lumina_browser_tabs'));
+            if (saved && Array.isArray(savedTabs) && savedTabs.some(t => t.id === saved)) return saved;
+        } catch { /* ignore */ }
+        return 'tab-default';
+    });
+    const [inputUrl, setInputUrl] = useState(() => {
+        try {
+            const savedTabs = JSON.parse(localStorage.getItem('lumina_browser_tabs'));
+            const savedActive = localStorage.getItem('lumina_browser_active_tab');
+            const t = Array.isArray(savedTabs) && savedTabs.find(x => x.id === savedActive);
+            if (t && t.url) return t.url;
+        } catch { /* ignore */ }
+        return 'https://www.google.com';
+    });
 
     // Bookmarks & Downloads
     const [bookmarks, setBookmarks] = useState(() => {
@@ -32,6 +64,20 @@ const BrowserWorkspacePanel = ({ socket, aiAudioData, isConnected, isMuted, mess
         localStorage.setItem('lumina_bookmarks', JSON.stringify(bookmarks));
     }, [bookmarks]);
 
+    // Persist tabs + active tab so they restore after an app restart. Store only
+    // serialisable fields (drop transient loading flag).
+    useEffect(() => {
+        try {
+            const slim = tabs.map(({ id, title, url, favicon }) => ({ id, title, url, favicon }));
+            localStorage.setItem('lumina_browser_tabs', JSON.stringify(slim));
+            localStorage.setItem('lumina_browser_active_tab', activeTabId);
+        } catch { /* storage full / unavailable — non-fatal */ }
+    }, [tabs, activeTabId]);
+
+    // Keep live refs current for the mount-scoped recovery listeners.
+    useEffect(() => { tabsRef.current = tabs; }, [tabs]);
+    useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
+
     // Active tab change sync
     useEffect(() => {
         const activeTab = tabs.find(t => t.id === activeTabId);
@@ -41,6 +87,30 @@ const BrowserWorkspacePanel = ({ socket, aiAudioData, isConnected, isMuted, mess
             setTimeout(updateBounds, 80);
         }
     }, [activeTabId]);
+
+    // Backend browser_open → load URL into the embedded browser (active tab).
+    // Keyed on openUrl.ts so repeated opens of the same URL still navigate.
+    // YouTube search URLs trigger the in-panel playback automation (wait for
+    // results → click first video → play → unmute → verify) via invoke IPC.
+    useEffect(() => {
+        if (openUrl && openUrl.url) {
+            setInputUrl(openUrl.url);
+            const ytMatch = /youtube\.com\/results\?search_query=([^&]+)/i.exec(openUrl.url);
+            if (ytMatch && ipcRenderer.invoke) {
+                const query = decodeURIComponent(ytMatch[1].replace(/\+/g, ' '));
+                ipcRenderer.invoke('browser-youtube-play', { tabId: activeTabId, query })
+                    .then(res => { console.log('[YT PLAY]', JSON.stringify(res)); })
+                    .catch(err => {
+                        console.warn('[YT PLAY] failed, plain load:', err);
+                        ipcRenderer.send('browser-load', { tabId: activeTabId, url: openUrl.url });
+                    });
+            } else {
+                ipcRenderer.send('browser-load', { tabId: activeTabId, url: openUrl.url });
+            }
+            setTimeout(updateBounds, 80);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [openUrl?.ts]);
 
     // Initialize tabs on mount
     useEffect(() => {
@@ -69,6 +139,22 @@ const BrowserWorkspacePanel = ({ socket, aiAudioData, isConnected, isMuted, mess
             handleAddTab(url);
         };
 
+        // Stale-view / crash recovery: recreate the BrowserView for a tab whose
+        // renderer died or went missing, then reload its last URL.
+        const onCrashed = (e, { tabId }) => {
+            const tab = tabsRef.current.find(t => t.id === tabId);
+            const url = tab ? tab.url : 'https://www.google.com';
+            ipcRenderer.send('browser-create-tab', { tabId, url });
+            if (tabId === activeTabIdRef.current) {
+                ipcRenderer.send('browser-switch-tab', { tabId });
+            }
+        };
+        const onStale = (e, { tabId, url }) => {
+            ipcRenderer.send('browser-create-tab', { tabId, url });
+            ipcRenderer.send('browser-switch-tab', { tabId });
+            ipcRenderer.send('browser-load', { tabId, url });
+        };
+
         // Download event listeners
         const onDownloadStart = (e, item) => {
             setDownloads(prev => [...prev, { ...item, progress: 0, state: 'progressing' }]);
@@ -90,7 +176,9 @@ const BrowserWorkspacePanel = ({ socket, aiAudioData, isConnected, isMuted, mess
         ipcRenderer.on('browser-event-favicon', onFavicon);
         ipcRenderer.on('browser-event-navigate', onNavigate);
         ipcRenderer.on('browser-event-new-tab', onNewTab);
-        
+        ipcRenderer.on('browser-event-crashed', onCrashed);
+        ipcRenderer.on('browser-event-stale', onStale);
+
         ipcRenderer.on('download-event-start', onDownloadStart);
         ipcRenderer.on('download-event-update', onDownloadUpdate);
         ipcRenderer.on('download-event-done', onDownloadDone);
@@ -115,6 +203,8 @@ const BrowserWorkspacePanel = ({ socket, aiAudioData, isConnected, isMuted, mess
             ipcRenderer.off('browser-event-favicon', onFavicon);
             ipcRenderer.off('browser-event-navigate', onNavigate);
             ipcRenderer.off('browser-event-new-tab', onNewTab);
+            ipcRenderer.off('browser-event-crashed', onCrashed);
+            ipcRenderer.off('browser-event-stale', onStale);
 
             ipcRenderer.off('download-event-start', onDownloadStart);
             ipcRenderer.off('download-event-update', onDownloadUpdate);
@@ -124,21 +214,42 @@ const BrowserWorkspacePanel = ({ socket, aiAudioData, isConnected, isMuted, mess
             if (observer) {
                 observer.disconnect();
             }
+            // Cancel any pending coalesced bounds send + reset cache so a later
+            // re-open re-sends fresh geometry.
+            if (boundsRafRef.current) {
+                cancelAnimationFrame(boundsRafRef.current);
+                boundsRafRef.current = 0;
+            }
+            lastBoundsRef.current = null;
             // Hide browser views when exiting
             ipcRenderer.send('browser-set-bounds', { visible: false });
         };
     }, []);
 
-    // Helper to calculate and sync target WebContents coordinates
+    // Helper to calculate and sync target WebContents coordinates.
+    // Coalesced via requestAnimationFrame + dedup so a burst of callers
+    // (mount timers, ResizeObserver, tab switch) results in ONE IPC send,
+    // and repeated identical bounds send nothing (no flicker).
     const updateBounds = () => {
-        if (!placeholderRef.current) return;
-        const rect = placeholderRef.current.getBoundingClientRect();
-        ipcRenderer.send('browser-set-bounds', {
-            x: rect.left,
-            y: rect.top,
-            width: rect.width,
-            height: rect.height,
-            visible: true
+        if (boundsRafRef.current) return; // already scheduled this frame
+        boundsRafRef.current = requestAnimationFrame(() => {
+            boundsRafRef.current = 0;
+            if (!placeholderRef.current) return;
+            const rect = placeholderRef.current.getBoundingClientRect();
+            const next = {
+                x: Math.round(rect.left),
+                y: Math.round(rect.top),
+                width: Math.round(rect.width),
+                height: Math.round(rect.height),
+                visible: true,
+            };
+            const prev = lastBoundsRef.current;
+            if (prev && prev.x === next.x && prev.y === next.y &&
+                prev.width === next.width && prev.height === next.height) {
+                return; // geometry unchanged — skip redundant reposition
+            }
+            lastBoundsRef.current = next;
+            ipcRenderer.send('browser-set-bounds', next);
         });
     };
 
@@ -210,7 +321,7 @@ const BrowserWorkspacePanel = ({ socket, aiAudioData, isConnected, isMuted, mess
     return (
         <div className="flex-1 flex gap-6 h-full w-full overflow-hidden min-h-0 pb-2">
             {/* ============ LEFT COLUMN: BROWSER VIEW WORKSPACE ============ */}
-            <div className="flex-1 flex flex-col glass-level-2 rounded-3xl border border-white/5 overflow-hidden relative min-h-0">
+            <div className="flex-[1.6] min-w-0 flex flex-col glass-level-2 rounded-3xl border border-white/5 overflow-hidden relative min-h-0">
                 {/* 1. Address Bar & Navigation Buttons */}
                 <div className="flex flex-col border-b border-white/5 bg-black/40 backdrop-blur-md px-4 py-2.5 space-y-1.5 shrink-0">
                     <div className="flex items-center gap-3">
@@ -326,7 +437,7 @@ const BrowserWorkspacePanel = ({ socket, aiAudioData, isConnected, isMuted, mess
             </div>
 
             {/* ============ RIGHT COLUMN: INTEGRATED LUMINA ASSISTANT SIDE PANEL ============ */}
-            <div className="w-80 flex flex-col justify-between shrink-0 h-full border border-white/5 rounded-3xl bg-black/40 backdrop-blur-2xl p-5 relative overflow-hidden min-h-0">
+            <div className="flex-1 min-w-[320px] max-w-[520px] flex flex-col justify-between shrink-0 h-full border border-white/5 rounded-3xl bg-black/40 backdrop-blur-2xl p-5 relative overflow-hidden min-h-0">
                 {/* Backlighting */}
                 <div className="absolute top-[-10%] right-[-10%] w-48 h-48 rounded-full bg-primary/5 blur-[50px] pointer-events-none" />
 

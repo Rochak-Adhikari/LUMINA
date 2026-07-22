@@ -13,7 +13,7 @@ IMPORTANT:
 
 import sqlite3
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from typing import List, Dict, Optional, Literal
 
@@ -278,7 +278,7 @@ class MemoryStore:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         metadata_json = json.dumps(metadata) if metadata else None
         
         cursor.execute("""
@@ -350,7 +350,7 @@ class MemoryStore:
                     UPDATE memories
                     SET last_accessed_at = ?, access_count = access_count + 1
                     WHERE id = ?
-                """, (datetime.utcnow().isoformat(), row[0]))
+                """, (datetime.now(UTC).isoformat(), row[0]))
         
         conn.commit()
         conn.close()
@@ -537,7 +537,7 @@ class MemoryStore:
             # Recency bonus (recent memories are more relevant)
             try:
                 created_dt = datetime.fromisoformat(created_at)
-                age_days = (datetime.utcnow() - created_dt).total_seconds() / 86400
+                age_days = (datetime.now(UTC) - created_dt).total_seconds() / 86400
                 recency_score = max(0, 5.0 - (age_days * 0.1))  # Decay over time
                 score += recency_score
             except:
@@ -570,7 +570,7 @@ class MemoryStore:
             if top_ids:
                 conn = sqlite3.connect(self.db_path)
                 cursor = conn.cursor()
-                timestamp = datetime.utcnow().isoformat()
+                timestamp = datetime.now(UTC).isoformat()
                 for mem_id in top_ids:
                     cursor.execute("""
                         UPDATE memories
@@ -668,7 +668,7 @@ class MemoryStore:
         """Promote a memory (e.g., pending → active). Returns True if updated."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).isoformat()
         if confidence is not None:
             cursor.execute("""
                 UPDATE memories SET state = ?, confidence = ?, last_confirmed_at = ?, priority = MIN(priority + 10, 100)
@@ -705,7 +705,7 @@ class MemoryStore:
         """Mark a memory as used — bumps priority and last_used_at."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).isoformat()
         cursor.execute("""
             UPDATE memories SET last_used_at = ?, last_accessed_at = ?,
                    access_count = access_count + 1,
@@ -723,7 +723,7 @@ class MemoryStore:
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         cutoff = (now - timedelta(days=threshold_days)).isoformat()
         
         # Decay priority for memories not used recently
@@ -755,7 +755,7 @@ class MemoryStore:
         """Get pending memories older than threshold for natural revisit."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cutoff = (datetime.utcnow() - timedelta(hours=older_than_hours)).isoformat()
+        cutoff = (datetime.now(UTC) - timedelta(hours=older_than_hours)).isoformat()
         cursor.execute("""
             SELECT id, type, content, metadata, created_at, access_count,
                    state, confidence, priority, last_confirmed_at, last_used_at
@@ -831,7 +831,7 @@ class MemoryStore:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).isoformat()
         c.execute("INSERT INTO quests (title, description, priority, status, progress, created_at) VALUES (?,?,?,?,0,?)",
                   (title, description, priority, status, now))
         qid = c.lastrowid
@@ -851,7 +851,7 @@ class MemoryStore:
         if not updates:
             conn.close()
             return None
-        updates["updated_at"] = datetime.utcnow().isoformat()
+        updates["updated_at"] = datetime.now(UTC).isoformat()
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         vals = list(updates.values()) + [quest_id]
         c.execute(f"UPDATE quests SET {set_clause} WHERE id = ?", vals)
@@ -886,7 +886,7 @@ class MemoryStore:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).isoformat()
         c.execute("INSERT INTO events (title, datetime, notes, created_at) VALUES (?,?,?,?)",
                   (title, dt, notes, now))
         eid = c.lastrowid
@@ -966,7 +966,7 @@ class MemoryStore:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).isoformat()
         c.execute("INSERT INTO archive_notes (title, body, tags, created_at) VALUES (?,?,?,?)",
                   (title, body, tags, now))
         nid = c.lastrowid
@@ -986,7 +986,7 @@ class MemoryStore:
         if not updates:
             conn.close()
             return None
-        updates["updated_at"] = datetime.utcnow().isoformat()
+        updates["updated_at"] = datetime.now(UTC).isoformat()
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         vals = list(updates.values()) + [note_id]
         c.execute(f"UPDATE archive_notes SET {set_clause} WHERE id = ?", vals)

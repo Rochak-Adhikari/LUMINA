@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
-import io from 'socket.io-client';
 import { Mic, MicOff, Settings, X, Minus, Power, Send, PanelLeftOpen, PanelLeftClose, Clock, ChevronRight } from 'lucide-react';
+
+// Shared networking layer (single Socket.IO connection)
+import socket from '../services/socket';
 
 // Reuse production components (no duplication)
 import Visualizer from '../components/Visualizer';
-import TopAudioBar from '../components/TopAudioBar';
 // SystemSettingsPanel replaces old SettingsWindow — rendered as a panel, not overlay
 import ConfirmationPopup from '../components/ConfirmationPopup';
 import BrowserWindow from '../components/BrowserWindow';
-import CadWindow from '../components/CadWindow';
 
 // New Ui_TEST panels
 import Sidebar from './components/Sidebar';
@@ -19,7 +19,6 @@ import SystemSettingsPanel from './panels/SystemSettingsPanel';
 import FeaturesPanel from './panels/FeaturesPanel';
 import BrowserWorkspacePanel from './panels/BrowserWorkspacePanel';
 
-const socket = io('http://localhost:8000');
 const { ipcRenderer } = window.require('electron');
 
 function AppTest() {
@@ -55,17 +54,15 @@ function AppTest() {
     const [isCameraFlipped, setIsCameraFlipped] = useState(false);
     const [cursorSensitivity, setCursorSensitivity] = useState(2.0);
 
-    // Browser / CAD overlays
-    const [cadData, setCadData] = useState(null);
-    const [cadThoughts, setCadThoughts] = useState('');
-    const [cadRetryInfo, setCadRetryInfo] = useState({ attempt: 1, maxAttempts: 3, error: null });
+    // Browser overlay
     const [browserData, setBrowserData] = useState({ image: null, logs: [] });
-    const [showCadWindow, setShowCadWindow] = useState(false);
     const [showBrowserWindow, setShowBrowserWindow] = useState(false);
 
     // NEW: Sidebar & Panel switching
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [activePanel, setActivePanel] = useState('home'); // 'home' | 'archive' | 'events' | 'quests' | 'settings'
+    // URL pushed by backend browser_open → embedded browser workspace
+    const [browserOpenUrl, setBrowserOpenUrl] = useState(null);
 
     // Alarm overlay
     const [alarmEvent, setAlarmEvent] = useState(null);
@@ -95,15 +92,14 @@ function AppTest() {
 
     // Auto-connect
     useEffect(() => {
-        if (isConnected && socketConnected && micDevices.length > 0 && !hasAutoConnectedRef.current) {
+        if (isConnected && socketConnected && !hasAutoConnectedRef.current) {
             hasAutoConnectedRef.current = true;
-            socket.emit('discover_kasa');
-            socket.emit('discover_printers');
             const timer = setTimeout(() => {
                 const index = micDevices.findIndex(d => d.deviceId === selectedMicId);
                 const queryDevice = micDevices.find(d => d.deviceId === selectedMicId);
                 const deviceName = queryDevice ? queryDevice.label : null;
                 setStatus('Connecting...');
+                console.log(`[TRACE] [FRONTEND] Emitting start_audio: index=${index}, name=${deviceName}`);
                 socket.emit('start_audio', {
                     device_index: index >= 0 ? index : null,
                     device_name: deviceName,
@@ -121,17 +117,20 @@ function AppTest() {
         socket.on('model_status', (data) => setModelStatus(data.status));
 
         socket.on('connect', () => {
+            console.log(`[TRACE] [FRONTEND] Socket connected SID=${socket.id}`);
             setStatus('Connected');
             setSocketConnected(true);
             setConnectionStatus('connected');
             socket.emit('get_settings');
         });
         socket.on('disconnect', () => {
+            console.log(`[TRACE] [FRONTEND] Socket disconnected`);
             setStatus('Disconnected');
             setSocketConnected(false);
             setConnectionStatus('offline');
         });
         socket.on('status', (data) => {
+            console.log(`[TRACE] [FRONTEND] Status event: ${data.msg}`);
             addMessage('System', data.msg);
             if (data.msg === 'Lumina Started') setStatus('Model Connected');
             else if (data.msg === 'Lumina Stopped') setStatus('Connected');
@@ -143,27 +142,13 @@ function AppTest() {
         });
         socket.on('error', (data) => addMessage('System', `Error: ${data.msg}`));
 
-        socket.on('cad_data', (data) => {
-            setCadData(data);
-            setCadThoughts('');
-            setShowCadWindow(true);
-        });
-        socket.on('cad_status', (data) => {
-            if (data.attempt) setCadRetryInfo({ attempt: data.attempt, maxAttempts: data.max_attempts || 3, error: data.error });
-            if (data.status === 'generating' || data.status === 'retrying') {
-                setCadData({ format: 'loading' });
-                setShowCadWindow(true);
-                if (data.status === 'generating' && data.attempt === 1) setCadThoughts('');
-            }
-        });
-        socket.on('cad_thought', (data) => setCadThoughts(prev => prev + data.text));
-
         socket.on('browser_frame', (data) => {
             setBrowserData(prev => ({ image: data.image, logs: [...prev.logs, data.log].filter(l => l).slice(-50) }));
             setShowBrowserWindow(true);
         });
 
         socket.on('transcription', (data) => {
+            console.log(`[TRACE] [FRONTEND] Transcription received: sender=${data.sender} text='${data.text ? data.text.slice(0, 40) : ""}'`);
             setMessages(prev => {
                 const lastMsg = prev[prev.length - 1];
                 if (lastMsg && lastMsg.sender === data.sender) {
@@ -221,9 +206,21 @@ function AppTest() {
         // Panel navigation via voice/typed command
         socket.on('navigate_panel', (data) => {
             const panel = data.panel || 'home';
-            setActivePanel(panel);
+            setActivePanel(prev => (prev === panel ? prev : panel));
             if (panel !== 'home') setSidebarOpen(true);
             console.log(`[NAV] source=${data.source || 'server'} panel=${panel} view=${data.view || 'all'}`);
+        });
+
+        // Embedded browser routing: backend browser_open pushes a URL here
+        // instead of spawning the external Brave. Open the browser workspace
+        // and hand the URL to BrowserWorkspacePanel.
+        socket.on('workspace_open', (data) => {
+            if (data && data.type === 'browser' && data.url) {
+                setBrowserOpenUrl({ url: data.url, ts: Date.now() });
+                setActivePanel(prev => (prev === 'browser' ? prev : 'browser'));
+                setSidebarOpen(true);
+                console.log(`[WORKSPACE] browser -> ${data.url}`);
+            }
         });
 
         // Device enumeration
@@ -240,11 +237,11 @@ function AppTest() {
 
         return () => {
             socket.off('connect'); socket.off('disconnect'); socket.off('status');
-            socket.off('audio_data'); socket.off('cad_data'); socket.off('cad_thought');
-            socket.off('cad_status'); socket.off('browser_frame'); socket.off('transcription');
+            socket.off('audio_data'); socket.off('browser_frame'); socket.off('transcription');
             socket.off('tool_confirmation_request'); socket.off('error');
             socket.off('reminder_alarm');
             socket.off('navigate_panel');
+            socket.off('workspace_open');
             stopMicVisualizer();
         };
     }, []);
@@ -277,6 +274,15 @@ function AppTest() {
             ipcRenderer.send('browser-set-bounds', { visible: false });
         }
     }, [activePanel]);
+
+    // Overlay guard: native BrowserView renders above the DOM, so it would
+    // occlude confirmation/alarm overlays. Detach the view while an overlay is
+    // active; re-attach when it clears (only meaningful on the browser panel).
+    useEffect(() => {
+        const overlayActive = !!confirmationRequest || !!alarmEvent;
+        if (activePanel !== 'browser') return;
+        ipcRenderer.send('browser-set-visible', { visible: !overlayActive });
+    }, [confirmationRequest, alarmEvent, activePanel]);
 
     // ========================================
     // HANDLERS — identical to production
@@ -388,9 +394,11 @@ function AppTest() {
         if (audioContextRef.current) audioContextRef.current.close();
     };
 
-    // Panel navigation
+    // Panel navigation — single source of truth. Idempotent: re-selecting the
+    // active panel is a no-op (prevents redundant re-renders / BrowserView
+    // attach-detach churn when multiple signals target the same panel).
     const navigateToPanel = (panel) => {
-        setActivePanel(panel);
+        setActivePanel(prev => (prev === panel ? prev : panel));
     };
 
     const audioAmp = aiAudioData.reduce((a, b) => a + b, 0) / aiAudioData.length / 255;
@@ -584,6 +592,7 @@ function AppTest() {
                         {activePanel === 'browser' && (
                             <BrowserWorkspacePanel
                                 socket={socket}
+                                openUrl={browserOpenUrl}
                                 aiAudioData={aiAudioData}
                                 isConnected={isConnected}
                                 isMuted={isMuted}
@@ -625,21 +634,6 @@ function AppTest() {
             </main>
 
             {/* ============ MODAL WINDOW OVERLAYS ============ */}
-            {/* CAD Window */}
-            {showCadWindow && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
-                    <div className="w-[520px] h-[520px] backdrop-blur-2xl bg-black/60 border border-cyan-500/20 shadow-2xl rounded-2xl overflow-hidden flex flex-col">
-                        <div className="h-10 bg-black/80 border-b border-cyan-500/25 flex items-center justify-between px-4 shrink-0">
-                            <span className="font-mono text-xs font-bold tracking-widest text-primary">CAD PROTOTYPER VIEW</span>
-                            <button onClick={() => setShowCadWindow(false)} className="text-on-surface-variant hover:text-red-400 text-sm transition-colors">✕</button>
-                        </div>
-                        <div className="flex-1 min-h-0">
-                            <CadWindow data={cadData} thoughts={cadThoughts} retryInfo={cadRetryInfo} onClose={() => setShowCadWindow(false)} socket={socket} />
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Browser Window */}
             {showBrowserWindow && (
                 <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">

@@ -1,0 +1,9 @@
+// frontend/components/browser/index.js — browser components barrel
+export { AddressBar } from './AddressBar';
+export { BrowserToolbar } from './BrowserToolbar';
+export { BrowserTabs } from './BrowserTabs';
+export { BrowserTab } from './BrowserTab';
+export { BrowserBookmarks } from './BrowserBookmarks';
+export { BrowserDownloads } from './BrowserDownloads';
+export { BrowserStatus } from './BrowserStatus';
+export { BrowserFind } from './BrowserFind';

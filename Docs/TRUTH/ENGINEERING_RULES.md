@@ -1,145 +1,142 @@
-# PHASE 5.4 EXECUTION RULES
+# PHASE 5.4 ENGINEERING RULES
+Version: 1.0
+Status: Authoritative
 
 These rules are mandatory for every implementation session.
-# Engineering Rules
-
-Before reading any file:
-
-1. Check VERIFICATION_CACHE.md.
-
-2. If the file exists there AND
-   SHA matches
-   AND session has not invalidated it
-
-DO NOT READ IT AGAIN.
-
-Use cached knowledge.
-
-Only reread if:
-
-- modified
-- user explicitly requested
-- dependency changed
-- implementation depends on new code
-
-Every reread must explain WHY.
----
-
-## 1. DO NOT RE-DISCOVER THE ARCHITECTURE
-
-The architecture has already been documented.
-
-Treat these documents as the source of truth.
-
-docs/architecture/
-
-Never re-read the entire repository unless explicitly requested.
 
 ---
 
-## 2. READ ONLY WHAT IS REQUIRED
+# PRIMARY OBJECTIVE
 
-Before modifying code, read ONLY:
+Implement ONLY the currently approved roadmap step.
 
-• files being modified
-• directly dependent interfaces
-• failing tests
-
-Never scan unrelated folders.
-
-Never inspect files outside the implementation scope.
-
----
-
-## 3. TRUST PREVIOUS VERIFICATION
-
-Unless I explicitly say the repository changed:
-
-DO NOT
-
-- rescan server.py
-- reread architecture docs
-- reread builtin skill catalog
-- reread Truth documents
-- rediscover invariants
-
-Assume they are unchanged.
-
----
-
-## 4. IMPLEMENTATION ORDER
-
-Always follow
-
-docs/architecture/05_IMPLEMENTATION_ROADMAP.md
-
-Never skip ahead.
-
-Never combine multiple roadmap steps.
-
----
-
-## 5. KEEP COMMITS ATOMIC
-
-One roadmap step
-
-↓
-
-One implementation
-
-↓
-
-One regression
-
-↓
-
-Stop.
-
-Never continue automatically.
-
----
-
-## 6. NEVER EXPAND SCOPE
-
-Do not perform cleanup.
-
-Do not modernize code.
-
-Do not rename things.
+Do not redesign.
 
 Do not optimize unrelated code.
 
-Only modify files required for the approved step.
+Do not expand scope.
 
 ---
 
-## 7. MINIMIZE TOKEN USAGE
+# SOURCE OF TRUTH
 
-Assume previous analyses remain valid.
+The architecture has already been verified.
 
-Only verify if
+The following documents are authoritative:
 
-• repository changed
+docs/architecture/
+Docs/TRUTH/
 
-• dependency changed
-
-• implementation requires it
-
-Otherwise continue immediately.
+Do NOT rediscover architecture unless explicitly requested.
 
 ---
 
-## 8. IF SOMETHING IS UNKNOWN
+# VERIFICATION CACHE
 
-Read ONLY the missing file.
+Before reading ANY repository file:
 
-Never restart repository analysis.
+1. Read VERIFICATION_CACHE.md.
+2. If the file is listed as VERIFIED,
+3. AND the user has not changed it,
+4. AND no dependency changed,
+
+DO NOT READ IT AGAIN.
+
+Assume previous verification remains valid.
 
 ---
 
-## 9. BEFORE CODING
+# CURRENT SESSION CACHE
 
-Output ONLY
+Files read during the current implementation session are considered cached.
+
+Never read the same file twice unless:
+
+- the file was modified
+- a dependency changed
+- the user explicitly requests rereading
+
+Otherwise reuse previous understanding.
+
+---
+
+# REPOSITORY READ POLICY
+
+Repository reads are expensive.
+
+Always ask:
+
+"Do I actually need this file?"
+
+If NO
+
+DO NOT READ IT.
+
+If YES
+
+Read it exactly once.
+
+Never perform repository-wide scans.
+
+Never inspect directories out of curiosity.
+
+Never reread unchanged files.
+
+---
+
+# READ ORDER
+
+Only read files in this order:
+
+1. VERIFICATION_CACHE.md
+2. Current roadmap document
+3. File being modified
+4. Direct dependency (only if required)
+5. Failing test (only if required)
+
+Never read unrelated modules.
+
+---
+
+# IMPLEMENTATION ORDER
+
+Always follow:
+
+docs/architecture/05_IMPLEMENTATION_ROADMAP.md
+
+Never skip steps.
+
+Never combine roadmap steps.
+
+Never anticipate future work.
+
+---
+
+# SCOPE RULES
+
+Modify ONLY files required for the approved roadmap step.
+
+Never:
+
+- rename unrelated code
+- clean unrelated code
+- modernize unrelated code
+- optimize unrelated code
+- move files
+- change formatting outside touched code
+
+Atomic commits only.
+
+---
+
+# BEFORE CODING
+
+If repository state has not changed output ONLY:
+
+No architectural changes detected.
+Proceeding with implementation.
+
+Then print:
 
 Files to modify
 
@@ -149,43 +146,77 @@ Dependencies
 
 Risks
 
-If unchanged from previous session, simply state
+Begin implementation.
 
-"No architectural changes detected.
-Proceeding with implementation."
+Do NOT perform additional repository analysis.
 
 ---
 
-## 10. AFTER CODING
+# AFTER CODING
 
-Only provide
+Output ONLY:
 
 Summary
 
 Files modified
 
-Tests run
+Tests executed
 
-Regression result
+Regression results
 
-Commit message
+Suggested commit message
 
-Stop.
+STOP.
 
-# 11. Repository Read Budget
+Do not continue to the next roadmap step.
 
-Treat repository reads as expensive operations.
+---
 
-Before opening any file, ask internally:
+# UNKNOWN INFORMATION
 
-"Is this file required to implement the current roadmap step?"
+If something is unknown:
 
-If the answer is NO,
+Read ONLY the missing file.
 
-do not read it.
+Never restart repository analysis.
 
-If the answer is YES,
+Never scan the repository looking for information.
 
-read it once.
+---
 
-Never read the same file multiple times during the same implementation session unless it has changed.
+# IMPLEMENTATION STOP RULE
+
+Once enough information exists to implement the current roadmap step:
+
+STOP READING.
+
+Begin implementation immediately.
+
+---
+
+# NEVER ASSUME NEW ARCHITECTURE
+
+Unless explicitly instructed:
+
+Assume
+
+- architecture unchanged
+- runtime unchanged
+- server.py unchanged
+- bootstrap unchanged
+- builtin skill catalog unchanged
+
+Do not verify them again.
+
+---
+
+# SUCCESS CRITERIA
+
+Success is defined as:
+
+- smallest possible implementation
+- roadmap compliance
+- zero scope expansion
+- passing regression tests
+- minimal repository reads
+- immediate stop after implementation

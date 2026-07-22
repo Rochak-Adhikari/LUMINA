@@ -1,0 +1,21 @@
+// frontend/hooks/index.js — shared hooks barrel
+export { useSetting, useSettingsStatus } from './useSetting';
+export { useSystemInfo } from './useSystemInfo';
+export { useSocket } from './useSocket';
+export { useSocketEvent } from './useSocketEvent';
+export { useConnectionStatus } from './useConnectionStatus';
+export { useChat } from './useChat';
+export { useCrudResource } from './useCrudResource';
+export { useQuests, useEvents, useArchive } from './useWorkspace';
+export { useMemory } from './useMemory';
+export { useIpc } from './useIpc';
+export { useBrowser } from './useBrowser';
+export { useBrowserEvents } from './useBrowserEvents';
+export { useVoice } from './useVoice';
+export { useToolConfirmation } from './useToolConfirmation';
+export { useReminderAlarm } from './useReminderAlarm';
+export { useFileUpload } from './useFileUpload';
+export { useDevices } from './useDevices';
+export { useRemoteControl } from './useRemoteControl';
+export { useVoiceNavigation } from './useVoiceNavigation';
+export { useProject } from './useProject';

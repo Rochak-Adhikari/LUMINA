@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const TOOLS = [
-    { id: 'generate_cad', label: 'Generate CAD' },
     { id: 'local_browser_control', label: 'Local Browser (Brave)' },
     { id: 'browser_control', label: 'Browser Agent (headless)' },
     { id: 'create_directory', label: 'Create Folder' },
@@ -11,12 +10,6 @@ const TOOLS = [
     { id: 'create_project', label: 'Create Project' },
     { id: 'switch_project', label: 'Switch Project' },
     { id: 'list_projects', label: 'List Projects' },
-    { id: 'list_smart_devices', label: 'List Devices' },
-    { id: 'control_light', label: 'Control Light' },
-    { id: 'discover_printers', label: 'Discover Printers' },
-    { id: 'print_stl', label: 'Print 3D Model' },
-    { id: 'get_print_status', label: 'Get Print Status' },
-    { id: 'iterate_cad', label: 'Iterate CAD' },
 ];
 
 const Toggle = ({ value, onChange, disabled }) => (
@@ -344,15 +337,6 @@ const SystemSettingsPanel = ({ socket, micDevices, speakerDevices, webcamDevices
                             className="text-xs text-cyan-100 bg-gray-900/80 border border-cyan-800/40 rounded-lg p-2 w-full file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-cyan-900/60 file:text-cyan-400 hover:file:bg-cyan-800 cursor-pointer transition-colors"
                         />
                     </div>
-                    <button
-                        onClick={() => {
-                            if (!hasHydratedRef.current) return;
-                            socket.emit('reset_settings');
-                        }}
-                        className="w-full py-2 px-3 rounded-lg text-xs font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20 transition-all duration-200"
-                    >
-                        Reset to Default
-                    </button>
                 </SectionCard>
             </div>
         </div>

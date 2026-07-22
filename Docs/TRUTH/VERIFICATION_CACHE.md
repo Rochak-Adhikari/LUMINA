@@ -1,14 +1,29 @@
-# Verification Cache
-
+# VERIFICATION CACHE
+Version: 1.0
 Status: Active
 
-The following files have already been verified during Phase 5.4.
+Purpose:
 
-Unless the user explicitly states they changed,
+Avoid unnecessary repository reads.
 
-DO NOT read them again.
+Previously verified files should NOT be reread unless their verification becomes invalid.
 
 ---
+
+# CACHE VALIDITY
+
+Verification remains valid until one of the following occurs:
+
+- the file changes
+- a direct dependency changes
+- the user explicitly requests verification
+- the current roadmap step requires a new interface
+
+Otherwise the cached understanding is authoritative.
+
+---
+
+# CURRENTLY VERIFIED
 
 ## Architecture
 
@@ -34,7 +49,7 @@ Docs/TRUTH/
 
 ---
 
-## Verified Runtime
+## Runtime
 
 backend/server.py
 
@@ -44,38 +59,114 @@ backend/core/bootstrap.py
 
 backend/core/runtime_facade.py
 
+---
+
+## Skill System
+
 backend/brain/skills/builtin.py
 
----
-
-## Rule
-
-Do not re-read any verified file unless
-
-1. the file changed
-
-2. a modified file directly depends on it
-
-3. the user explicitly requests re-verification
-
-Otherwise assume verification remains valid.
+backend/brain/skills/registry.py
 
 ---
 
-## Repository Policy
+# CURRENT SESSION CACHE
 
-Never perform full repository scans during implementation.
+During each implementation session maintain an internal cache of files already read.
 
-Read only files directly involved in the current roadmap step.
+Never reread these files unless they were modified during the session.
+
+Example:
+
+backend/brain/planning/llm_planner.py
+
+backend/tests/test_phase_5_4.py
+
+backend/brain/core/brain_core.py
 
 ---
 
-## Goal
+# READ BUDGET
 
-Reduce unnecessary repository reads.
+Repository reads are expensive.
 
-Reduce token usage.
+Maximum policy:
 
-Reduce API cost.
+Read each required file exactly once.
 
-Preserve implementation correctness.
+Never reread unchanged files.
+
+Never perform repository-wide searches.
+
+Never inspect sibling modules without direct dependency.
+
+Never perform "verification" reads after implementation unless requested.
+
+---
+
+# WHEN A FILE MAY BE READ
+
+A verified file may ONLY be read if:
+
+1. It was modified.
+
+2. One of its direct dependencies changed.
+
+3. The user explicitly requests re-verification.
+
+4. The approved roadmap step requires information not already available.
+
+Otherwise use cached knowledge.
+
+---
+
+# IMPLEMENTATION POLICY
+
+For every roadmap step:
+
+1. Check this cache.
+
+2. Determine required files.
+
+3. Read only those files.
+
+4. Implement.
+
+5. Run regression.
+
+6. Stop.
+
+Never restart repository discovery.
+
+Never rescan architecture.
+
+Never rediscover invariants.
+
+---
+
+# REPOSITORY POLICY
+
+Full repository scans are prohibited during implementation unless explicitly requested by the user.
+
+Directory exploration is prohibited unless required to locate a missing implementation file.
+
+Architecture rediscovery is prohibited.
+
+Repeated verification is prohibited.
+
+---
+
+# GOAL
+
+Minimize:
+
+- repository reads
+- token usage
+- API cost
+- implementation time
+
+while preserving:
+
+- correctness
+- roadmap compliance
+- deterministic implementation
+- regression safety

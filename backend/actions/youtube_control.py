@@ -75,6 +75,16 @@ def _open_url(url: str) -> bool:
 
     No CDP check. No Playwright. Pure subprocess.
     """
+    # Prefer the embedded browser workspace (Electron renderer) — same routing
+    # as browser_open, so YouTube opens in-app instead of an external window.
+    try:
+        from actions import emit_workspace_browser
+        if emit_workspace_browser(url):
+            print(f"[YouTube] Routed to embedded browser panel: {url}")
+            return True
+    except Exception as e:
+        print(f"[YouTube] Embedded routing unavailable ({e}); falling back")
+
     if not os.path.isfile(_BRAVE_EXE):
         print(f"[YouTube] Brave not found at: {_BRAVE_EXE}")
         return False
@@ -234,3 +244,27 @@ def youtube_control(
     print(f"[YouTube] Unknown action '{action}' — falling back to search: {fallback_query!r}")
     _open_url(_yt_search_url(fallback_query))
     return f"Searching YouTube for: {fallback_query}"
+
+
+def youtube_play(
+    parameters:     dict,
+    response=None,
+    player=None,
+    session_memory=None,
+) -> str:
+    """
+    Advertised tool `youtube_play` — play/search a video on YouTube.
+
+    The tool schema (tools/__init__.py::youtube_play_tool) is `{query}`.
+    This adapter maps it onto the existing youtube_control(play_first) logic so
+    the advertised tool has a real, registered handler (fixes "Unknown tool").
+    """
+    params = parameters or {}
+    query = (params.get("query") or params.get("q") or "").strip()
+    if not query:
+        return "Please provide something to play on YouTube."
+    return youtube_control(
+        {"action": "play_first", "query": query},
+        response, player, session_memory,
+    )
+

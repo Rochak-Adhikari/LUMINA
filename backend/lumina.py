@@ -263,6 +263,7 @@ from persona_engine import get_persona_engine
 
 class AudioLoop:
     def __init__(self, video_mode=DEFAULT_MODE, on_audio_data=None, on_video_frame=None, on_cad_data=None, on_web_data=None, on_transcription=None, on_tool_confirmation=None, on_cad_status=None, on_cad_thought=None, on_project_update=None, on_device_update=None, on_error=None, on_model_status=None, input_device_index=None, input_device_name=None, output_device_index=None, memory_store=None, project_manager=None):
+        print("[TRACE] [AUDIOLOOP] AudioLoop instance initialized")
         self.video_mode = video_mode
         self.on_audio_data = on_audio_data
         self.on_video_frame = on_video_frame
@@ -607,7 +608,23 @@ class AudioLoop:
     async def send_realtime(self):
         while True:
             msg = await self.out_queue.get()
-            await self.session.send(input=msg, end_of_turn=False)
+            # Realtime media (audio/video chunks) MUST go through
+            # send_realtime_input as a Blob. Sending them via session.send(input=)
+            # — the turn/content channel — makes the Live API reject the stream
+            # with 1007 CONTENT_TYPE_AUDIO_NOT_SUPPORTED and tear the session
+            # (surfacing as 1011). Text/turn content still uses send().
+            try:
+                if isinstance(msg, dict) and "mime_type" in msg and "data" in msg:
+                    await self.session.send_realtime_input(
+                        media=types.Blob(data=msg["data"], mime_type=msg["mime_type"])
+                    )
+                else:
+                    await self.session.send(input=msg, end_of_turn=False)
+            except Exception as e:
+                # Never let a single chunk crash the sender; let the outer
+                # TaskGroup/reconnect loop handle genuine session death.
+                print(f"[LUMINA DEBUG] [SEND] realtime send error: {type(e).__name__}: {e}")
+                raise
 
     async def listen_audio(self):
         # ========================================
@@ -1381,6 +1398,18 @@ class AudioLoop:
                     retry_delay = 1
                     emit_model_status('connected')
                     print(f"[LUMINA DEBUG] [CONNECT] Successfully connected to Gemini Live")
+                    print("[TRACE] [AUDIOLOOP] Gemini websocket connected, session ready")
+
+                    # Flush queued text messages if any were received while connecting
+                    if hasattr(self, '_pending_text_queue') and self._pending_text_queue:
+                        queued = self._pending_text_queue[:]
+                        self._pending_text_queue.clear()
+                        print(f"[LUMINA] Flushing {len(queued)} queued text message(s) to Gemini session")
+                        for q_sid, q_text in queued:
+                            try:
+                                await self.session.send(input=q_text, end_of_turn=True)
+                            except Exception as _qe:
+                                print(f"[LUMINA] Error flushing queued message: {_qe}")
                     
                     await self.stop_event.wait()
 

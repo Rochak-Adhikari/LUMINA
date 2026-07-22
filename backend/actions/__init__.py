@@ -25,6 +25,10 @@ if _backend_dir not in sys.path:
 from core.registry import ActionRegistry
 
 main_loop = None
+# Socket.IO server handle, injected by server.py at startup. Lets thread-run
+# action tools push events to the Electron renderer (e.g. route normal browsing
+# to the embedded browser panel instead of the external dedicated Brave).
+sio = None
 
 def run_coroutine(coro):
     """Run a coroutine on the main thread event loop (threadsafe)."""
@@ -37,6 +41,31 @@ def run_coroutine(coro):
         except Exception as e:
             print(f"[ACTIONS] run_coroutine_threadsafe failed: {e}")
     return asyncio.run(coro)
+
+
+def emit_workspace_browser(url: str) -> bool:
+    """
+    Ask the Electron renderer to open *url* in the embedded browser workspace.
+
+    Thread-safe: schedules ``sio.emit('workspace_open', {...})`` onto the main
+    event loop. Returns True only when the emit was dispatched (frontend bridge
+    available), so callers can fall back to the external browser when the UI is
+    not reachable (e.g. headless / no active socket). Never raises.
+    """
+    global sio, main_loop
+    if sio is None or main_loop is None:
+        return False
+    try:
+        import asyncio
+        fut = asyncio.run_coroutine_threadsafe(
+            sio.emit('workspace_open', {'type': 'browser', 'url': url}),
+            main_loop,
+        )
+        fut.result(timeout=3)
+        return True
+    except Exception as e:
+        print(f"[ACTIONS] emit_workspace_browser failed: {e}")
+        return False
 
 
 def _try_register(name: str, module_path: str, func_name: str) -> None:
@@ -71,6 +100,7 @@ _try_register("file_processor",   "actions.file_processor",    "file_processor")
 _try_register("dev_agent",        "actions.dev_agent",         "dev_agent")
 _try_register("flight_finder",    "actions.flight_finder",     "flight_finder")
 _try_register("game_updater",     "actions.game_updater",      "game_updater")
+_try_register("youtube_play",     "actions.youtube_control",   "youtube_play")
 
 # Backward-compatible alias: existing code uses ACTION_REGISTRY as a dict
 # ActionRegistry._entries() returns the same dict used internally

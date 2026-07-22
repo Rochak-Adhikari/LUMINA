@@ -264,16 +264,28 @@ def _try_navigate_active_tab(url: str) -> bool:
 
 def _open_in_lumina_browser(url: str) -> bool:
     """
-    Open a URL in Lumina's dedicated Brave browser (reuse-first policy).
+    Open a URL for normal browsing.
 
-    Strategy:
-    1. If Lumina's browser is already running (CDP reachable on port 9223):
-       a. Navigate the active tab in-place via CDP WebSocket (reuse, no new tab).
-       b. If that fails, fall back to launching a new tab via subprocess.
-    2. If not running: launch the dedicated Lumina browser with this URL.
+    Primary path (desired UX): route to the EMBEDDED browser panel in the
+    Electron renderer via a `workspace_open` event. No external window appears.
+
+    Fallback (frontend unreachable — headless, no socket): use Lumina's
+    dedicated Brave browser (reuse-first via CDP, else launch). The dedicated
+    Brave remains the automation browser; this fallback only covers the case
+    where the embedded panel can't receive the URL.
 
     NEVER uses os.startfile, NEVER opens in personal Brave.
     """
+    # 1. Prefer the embedded browser workspace (Electron renderer).
+    try:
+        from actions import emit_workspace_browser
+        if emit_workspace_browser(url):
+            print(f"[BrowserOpen] Routed to embedded browser panel: {url}")
+            return True
+    except Exception as e:
+        print(f"[BrowserOpen] Embedded routing unavailable ({e}); falling back")
+
+    # 2. Fallback — dedicated Brave (frontend not reachable).
     if not os.path.isfile(_BRAVE_EXE):
         print(f"[BrowserOpen] Brave not found at {_BRAVE_EXE}")
         return False

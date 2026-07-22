@@ -49,7 +49,7 @@ import sys
 import os
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 
 
@@ -67,7 +67,37 @@ from persona_engine import init_persona_engine, get_persona_engine
 
 # Create a Socket.IO server
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
-app = FastAPI()
+
+# FastAPI lifespan (replaces deprecated @app.on_event startup/shutdown).
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def _lifespan(app):
+    # ---- startup ----
+    global _alarm_task
+    import sys
+    print(f"[SERVER DEBUG] Startup Event Triggered")
+    print(f"[SERVER DEBUG] Python Version: {sys.version}")
+    try:
+        loop = asyncio.get_running_loop()
+        print(f"[SERVER DEBUG] Running Loop: {type(loop)}")
+        policy = asyncio.get_event_loop_policy()
+        print(f"[SERVER DEBUG] Current Policy: {type(policy)}")
+    except Exception as e:
+        print(f"[SERVER DEBUG] Error checking loop: {e}")
+    # Start the reminder alarm scheduler
+    _alarm_task = asyncio.create_task(_reminder_alarm_loop())
+    try:
+        yield
+    finally:
+        # ---- shutdown ----
+        # Delegates to ApplicationHost unified lifecycle (Phase 4.5) instead of
+        # performing its own cleanup.
+        print("\n[SERVER] FastAPI shutdown event triggered...")
+        await _app_host.stop()
+        print("[SERVER] FastAPI shutdown complete.")
+
+app = FastAPI(lifespan=_lifespan)
 
 # Register Remote Control Dashboard Routes
 from dashboard_routes import register_dashboard_routes
@@ -75,16 +105,10 @@ register_dashboard_routes(app)
 
 app_socketio = socketio.ASGIApp(sio, app)
 
-# Phase E3: FastAPI shutdown event handler (replaces signal handlers)
-@app.on_event("shutdown")
-async def shutdown_event():
-    """
-    Phase 4.5: FastAPI shutdown event — delegates to ApplicationHost
-    unified lifecycle instead of performing its own cleanup.
-    """
-    print("\n[SERVER] FastAPI shutdown event triggered...")
-    await _app_host.stop()
-    print("[SERVER] FastAPI shutdown complete.")
+# Inject the Socket.IO handle into the actions package so thread-run action
+# tools can push events to the renderer (e.g. embedded-browser routing).
+import actions as _actions_pkg
+_actions_pkg.sio = sio
 
 # ========================================
 # PHASE D.1: GLOBAL STATE + HEARTBEAT
@@ -281,7 +305,7 @@ async def save_session_summary(reason: str = "Idle timeout"):
                 summary_parts.append(f"User shared {len(prefs)} preference(s).")
         
         # Add timestamp context
-        summary_parts.append(f"Last activity: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}.")
+        summary_parts.append(f"Last activity: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}.")
         summary_parts.append("Ready to continue where we left off.")
         
         summary_content = " ".join(summary_parts)
@@ -757,23 +781,6 @@ async def _reminder_alarm_loop():
         except Exception as e:
             print(f"[ALARM] Scheduler error (non-fatal): {e}")
 
-@app.on_event("startup")
-async def startup_event():
-    global _alarm_task
-    import sys
-    print(f"[SERVER DEBUG] Startup Event Triggered")
-    print(f"[SERVER DEBUG] Python Version: {sys.version}")
-    try:
-        loop = asyncio.get_running_loop()
-        print(f"[SERVER DEBUG] Running Loop: {type(loop)}")
-        policy = asyncio.get_event_loop_policy()
-        print(f"[SERVER DEBUG] Current Policy: {type(policy)}")
-    except Exception as e:
-        print(f"[SERVER DEBUG] Error checking loop: {e}")
-
-    # Start the reminder alarm scheduler
-    _alarm_task = asyncio.create_task(_reminder_alarm_loop())
-
 @app.get("/status")
 async def status():
     return {"status": "running", "service": "Lumina Backend"}
@@ -872,7 +879,7 @@ async def heartbeat_loop():
     global connected_clients
     while True:
         await asyncio.sleep(5)
-        now = datetime.utcnow().timestamp()
+        now = datetime.now(UTC).timestamp()
         stale_clients = []
         
         for sid, info in list(connected_clients.items()):
@@ -899,7 +906,7 @@ async def hb_pong(sid):
     """Client responds to heartbeat ping"""
     global connected_clients
     if sid in connected_clients:
-        connected_clients[sid]['last_pong'] = datetime.utcnow().timestamp()
+        connected_clients[sid]['last_pong'] = datetime.now(UTC).timestamp()
         if connected_clients[sid]['status'] == 'stale':
             print(f"[HB] Client {sid} recovered")
             connected_clients[sid]['status'] = 'connected'
@@ -909,10 +916,11 @@ async def hb_pong(sid):
 async def connect(sid, environ):
     global connected_clients, heartbeat_task, idle_timer_task
     print(f"[SOCKET] connect: {sid}")
+    print(f"[TRACE] [BACKEND] Socket connected SID={sid}")
     
     # Phase D.1.a: Track client for heartbeat
     connected_clients[sid] = {
-        'last_pong': datetime.utcnow().timestamp(),
+        'last_pong': datetime.now(UTC).timestamp(),
         'status': 'connected'
     }
     
@@ -1125,6 +1133,7 @@ async def start_audio(sid, data=None):
             return
 
     print("[SOCKET] start_audio request")
+    print(f"[TRACE] [BACKEND] start_audio received SID={sid} data={data}")
 
     device_index = None
     device_name = None
@@ -1536,6 +1545,7 @@ async def shutdown(sid, data=None):
 async def user_input(sid, data):
     text = data.get('text')
     print(f"[SERVER DEBUG] User input received: '{text}'")
+    print(f"[TRACE] [BACKEND] user_input received text='{text}' SID={sid}")
 
     # Phase 4.3: query the active session via SessionManager (single read per turn)
     audio_loop = _session_mgr.audio_loop
@@ -1543,7 +1553,7 @@ async def user_input(sid, data):
     memory_engine = _svc.knowledge_manager
 
     # Phase D.4: Per-turn metrics tracking
-    turn_start_time = datetime.utcnow()
+    turn_start_time = datetime.now(UTC)
     
     # Phase E3: Update last activity timestamp
     global last_user_activity, idle_disabled_until_ts
@@ -1571,8 +1581,16 @@ async def user_input(sid, data):
             asyncio.create_task(_store_transcript("user", _flushed, _proj))
 
     if not audio_loop:
-        print("[SERVER DEBUG] [Error] Audio loop is None. Cannot send text.")
-        return
+        print("[SERVER DEBUG] Audio loop is None — lazy initializing session on demand...")
+        await start_audio(sid)
+        audio_loop = _session_mgr.audio_loop
+        if not audio_loop:
+            print("[SERVER DEBUG] [Error] Failed to initialize AudioLoop on demand.")
+            await sio.emit('chat_message', {
+                'sender': 'System',
+                'text': '❌ Failed to initialize assistant session. Please try again.'
+            }, room=sid)
+            return
 
     if not text:
         return
@@ -1586,7 +1604,7 @@ async def user_input(sid, data):
         # Normalize: lowercase, strip outer whitespace, remove all punctuation
         _clean = re.sub(r'[^\w\s]', '', text.lower()).strip()
         _clean = re.sub(r'\s+', ' ', _clean)  # collapse whitespace
-        _now_iso = datetime.utcnow().isoformat()
+        _now_iso = datetime.now(UTC).isoformat()
         
         # Strong confirm phrases — always trigger if there's ANY valid target
         _strong_confirm = [
@@ -1729,7 +1747,7 @@ async def user_input(sid, data):
                 print(f"[MEMORY REVISIT] Already awaiting response for revisit id={audio_loop._revisit_target_id}, ignoring duplicate cue")
             else:
                 try:
-                    cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+                    cutoff = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
                     all_active = _svc.memory_store.get_by_state("active", limit=50)
                     stale = [m for m in all_active
                              if m.get('type') in ('preference', 'intent')
@@ -1739,7 +1757,7 @@ async def user_input(sid, data):
                         audio_loop._revisit_target_id = target['id']
                         audio_loop._revisit_target_content = target['content']
                         audio_loop._revisit_target_type = target['type']
-                        _ts = datetime.utcnow().isoformat()
+                        _ts = datetime.now(UTC).isoformat()
                         print(f"[MEMORY REVISIT] Set revisit target id={target['id']}: {target['content'][:60]}")
                         await sio.emit('memory_lifecycle_event', {
                             'event': 'revisit_prompt', 'id': target['id'],
@@ -2160,7 +2178,7 @@ async def user_input(sid, data):
                         audio_loop._current_pending_consent_id = mem_id
                         audio_loop._current_pending_consent_content = candidate['content']
                         audio_loop._current_pending_consent_type = candidate['type']
-                        _ts = datetime.utcnow().isoformat()
+                        _ts = datetime.now(UTC).isoformat()
                         await sio.emit('memory_lifecycle_event', {
                             'event': 'pending', 'id': mem_id,
                             'memory_id': mem_id,
@@ -2180,7 +2198,7 @@ async def user_input(sid, data):
     if _svc.has_memory_store and memory_engine:
         try:
             memory_signals = memory_engine.detect_memory_signals(text, _svc.memory_store)
-            _ts = datetime.utcnow().isoformat()
+            _ts = datetime.now(UTC).isoformat()
             for sig in memory_signals:
                 # Track for consent (last one wins if multiple, but typically only one per message)
                 audio_loop._current_pending_consent_id = sig['id']
@@ -2394,7 +2412,7 @@ async def user_input(sid, data):
     # Combine memory context + persona context + nepali directive + user text
     full_message = memory_context + persona_context + _nepali_directive + text
     
-    memory_inject_time = datetime.utcnow()
+    memory_inject_time = datetime.now(UTC)
     memory_ms = int((memory_inject_time - turn_start_time).total_seconds() * 1000)
     
     print(f"[SERVER DEBUG] Message payload: memory_prefix={len(memory_context)} chars, user_text={len(text)} chars")
@@ -2414,9 +2432,9 @@ async def user_input(sid, data):
         except Exception as e:
             print(f"[SERVER DEBUG] Failed to send piggyback frame: {e}")
             
-    llm_send_time = datetime.utcnow()
+    llm_send_time = datetime.now(UTC)
     await audio_loop.safe_send(full_message, end_of_turn=True, timeout=15.0)
-    llm_complete_time = datetime.utcnow()
+    llm_complete_time = datetime.now(UTC)
     
     # Phase D.4: Per-turn metrics
     llm_total_ms = int((llm_complete_time - llm_send_time).total_seconds() * 1000)

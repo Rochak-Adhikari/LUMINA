@@ -7,8 +7,13 @@ const { spawn } = require('child_process');
 app.commandLine.appendSwitch('use-angle', 'd3d11');
 app.commandLine.appendSwitch('enable-features', 'Vulkan');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
-// Expose CDP port 9223 so that backend Playwright can connect directly to internal tabs
-app.commandLine.appendSwitch('remote-debugging-port', '9223');
+// Electron's own renderer debug port. MUST NOT be 9223 — that port is reserved
+// for Lumina's dedicated Brave instance (backend browser tools connect_over_cdp
+// to 9223). Sharing it let the backend's browser_open "reuse active tab" grab
+// the Electron renderer and navigate the whole app to the opened site, killing
+// the React tree + Socket.IO connection. Use a distinct port to keep the two
+// CDP surfaces isolated.
+app.commandLine.appendSwitch('remote-debugging-port', '9444');
 
 let mainWindow;
 let pythonProcess;
@@ -75,14 +80,17 @@ function createWindow() {
         });
     });
 
-    // In dev, load Vite server. In prod, load index.html
+    // In dev, load Vite server. In prod, load the built HTML.
+    // Target the NEW modular frontend (frontend.html → /frontend/main.jsx),
+    // not the legacy entry (index.html → /src/main.jsx). Dev: Vite serves any
+    // root HTML entry by path. Prod: the new frontend builds to dist-fe/.
     const isDev = process.env.NODE_ENV !== 'production';
 
     const loadFrontend = (retries = 3) => {
-        const url = isDev ? 'http://localhost:5173' : null;
+        const url = isDev ? 'http://localhost:5173/frontend.html' : null;
         const loadPromise = isDev
             ? mainWindow.loadURL(url)
-            : mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+            : mainWindow.loadFile(path.join(__dirname, '../dist-fe/frontend.html'));
 
         loadPromise
             .then(() => {
@@ -179,7 +187,12 @@ app.whenReady().then(() => {
             const redirectUrl = details.url
                 .replace('localhost:8000', `localhost:${backendPort}`)
                 .replace('127.0.0.1:8000', `127.0.0.1:${backendPort}`);
-            callback({ redirectURL: redirectUrl });
+            if (redirectUrl !== details.url) {
+                console.log(`[TRACE] [ELECTRON PROXY] Redirecting request ${details.url} -> ${redirectUrl}`);
+                callback({ redirectURL: redirectUrl });
+            } else {
+                callback({});
+            }
         }
     );
 
@@ -246,6 +259,13 @@ app.whenReady().then(() => {
 
         view.webContents.on('did-navigate-in-page', (e, navUrl) => {
             mainWindow.webContents.send('browser-event-navigate', { tabId, url: navUrl });
+        });
+
+        // Stale-view recovery: if this tab's renderer crashes, tell the frontend
+        // so it can recreate the tab instead of showing a dead view.
+        view.webContents.on('render-process-gone', (e, details) => {
+            console.warn(`[ELECTRON BROWSER] tab ${tabId} render-process-gone: ${details && details.reason}`);
+            mainWindow.webContents.send('browser-event-crashed', { tabId, reason: details && details.reason });
         });
 
         // Set secure permissions handler
@@ -366,17 +386,24 @@ app.whenReady().then(() => {
 
     ipcMain.on('browser-load', (event, { tabId, url }) => {
         const targetTabId = tabId || activeTabId;
-        if (targetTabId && browserViews[targetTabId]) {
-            let targetUrl = url;
-            if (!/^https?:\/\//i.test(targetUrl)) {
-                if (targetUrl.includes('.') && !targetUrl.includes(' ')) {
-                    targetUrl = 'https://' + targetUrl;
-                } else {
-                    targetUrl = 'https://www.google.com/search?q=' + encodeURIComponent(targetUrl);
-                }
+        const view = browserViews[targetTabId];
+        let targetUrl = url;
+        if (!/^https?:\/\//i.test(targetUrl)) {
+            if (targetUrl.includes('.') && !targetUrl.includes(' ')) {
+                targetUrl = 'https://' + targetUrl;
+            } else {
+                targetUrl = 'https://www.google.com/search?q=' + encodeURIComponent(targetUrl);
             }
-            browserViews[targetTabId].webContents.loadURL(targetUrl);
         }
+        // Stale-view recovery: if the view is gone/destroyed, ask the renderer
+        // to recreate the tab instead of silently dropping the navigation.
+        if (!view || view.webContents.isDestroyed()) {
+            mainWindow.webContents.send('browser-event-stale', { tabId: targetTabId, url: targetUrl });
+            return;
+        }
+        view.webContents.loadURL(targetUrl).catch(err => {
+            mainWindow.webContents.send('browser-event-load-error', { tabId: targetTabId, url: targetUrl, error: String(err && err.message || err) });
+        });
     });
 
     ipcMain.on('browser-go-back', (event, { tabId }) => {
@@ -398,6 +425,109 @@ app.whenReady().then(() => {
         if (targetTabId && browserViews[targetTabId]) {
             browserViews[targetTabId].webContents.reload();
         }
+    });
+
+    // ---- IPC robustness: invokable execute-JS with ack + stale-view guard ----
+    // Renderer uses ipcRenderer.invoke('browser-execute-js', ...) and awaits a
+    // result, so it can time out / retry rather than fire-and-forget.
+    ipcMain.handle('browser-execute-js', async (event, { tabId, code }) => {
+        const targetTabId = tabId || activeTabId;
+        const view = browserViews[targetTabId];
+        if (!view || view.webContents.isDestroyed()) {
+            return { ok: false, error: 'no_live_view' };
+        }
+        try {
+            const result = await view.webContents.executeJavaScript(code, true);
+            return { ok: true, result };
+        } catch (e) {
+            return { ok: false, error: String(e && e.message || e) };
+        }
+    });
+
+    // ---- YouTube playback automation (Task: play first result in-panel) ----
+    // Navigates the active tab to a YouTube search, then polls the DOM to click
+    // the first real video, waits for the <video> player, calls play(), unmutes,
+    // and confirms playback. Retries past ads / unavailable / age-gated results.
+    ipcMain.handle('browser-youtube-play', async (event, { tabId, query }) => {
+        const targetTabId = tabId || activeTabId;
+        const view = browserViews[targetTabId];
+        if (!view || view.webContents.isDestroyed()) {
+            return { ok: false, error: 'no_live_view' };
+        }
+        const wc = view.webContents;
+        const searchUrl = 'https://www.youtube.com/results?search_query=' +
+            encodeURIComponent(query || '');
+        try {
+            await wc.loadURL(searchUrl);
+        } catch (e) {
+            return { ok: false, error: 'load_failed: ' + String(e && e.message || e) };
+        }
+
+        // 1. Wait for results + click the first valid video link.
+        const clickScript = `
+        (async () => {
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          // wait up to 8s for result renderers
+          for (let i = 0; i < 40; i++) {
+            const links = [...document.querySelectorAll('a#video-title, a.ytd-video-renderer, ytd-video-renderer a#thumbnail')]
+              .filter(a => a.href && a.href.includes('/watch?v='));
+            if (links.length) {
+              const target = links[0];
+              const href = target.href;
+              target.click();
+              return { clicked: true, href };
+            }
+            await sleep(200);
+          }
+          return { clicked: false };
+        })();`;
+        let clickRes;
+        try { clickRes = await wc.executeJavaScript(clickScript, true); }
+        catch (e) { return { ok: false, error: 'click_script_error: ' + String(e) }; }
+        if (!clickRes || !clickRes.clicked) {
+            return { ok: false, error: 'no_results' };
+        }
+
+        // 2. Wait for the player, call play(), unmute, verify — retry on ad/unavailable.
+        const playScript = `
+        (async () => {
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          // A genuine unavailability shows a persistent error AND no usable video.
+          const hardError = () => {
+            const err = document.querySelector('.ytp-error, yt-playability-error-supported-renderers');
+            const v = document.querySelector('video');
+            return !!err && (!v || (v.readyState < 2 && !v.currentTime));
+          };
+          for (let attempt = 0; attempt < 3; attempt++) {
+            // wait for a usable <video> up to 8s (don't bail on transient errors)
+            let v = null;
+            for (let i = 0; i < 40; i++) {
+              v = document.querySelector('video.html5-main-video, video');
+              if (v && v.readyState >= 2) break;
+              await sleep(200);
+            }
+            if (!v) {
+              // no video at all — if a hard error is showing, it's unavailable
+              if (hardError()) return { playing: false, reason: 'unavailable' };
+              await sleep(500); continue;
+            }
+            try { v.muted = false; v.volume = Math.max(v.volume, 0.5); } catch (e) {}
+            try { await v.play(); } catch (e) {}
+            await sleep(600);
+            if (!v.paused && v.currentTime > 0) {
+              const ad = !!document.querySelector('.ad-showing, .ytp-ad-player-overlay');
+              return { playing: true, currentTime: v.currentTime, muted: v.muted, ad, url: location.href };
+            }
+            // paused (autoplay blocked or ad transition) — try again
+            await sleep(700);
+          }
+          const v = document.querySelector('video');
+          return { playing: v ? (!v.paused && v.currentTime > 0) : false, reason: 'retry_exhausted' };
+        })();`;
+        let playRes;
+        try { playRes = await wc.executeJavaScript(playScript, true); }
+        catch (e) { return { ok: false, error: 'play_script_error: ' + String(e) }; }
+        return { ok: true, ...playRes };
     });
 
     ipcMain.on('browser-set-bounds', (event, bounds) => {
@@ -423,6 +553,32 @@ app.whenReady().then(() => {
                 mainWindow.removeBrowserView(view);
             }
         }
+    });
+
+    // Overlay guard: hide/show the BrowserView WITHOUT losing its geometry.
+    // Native BrowserView renders above the DOM, so confirmation/alarm overlays
+    // are otherwise occluded. The renderer calls this to detach the view while
+    // an overlay is active, then re-attach with the last known bounds.
+    ipcMain.on('browser-set-visible', (event, { visible }) => {
+        if (!(activeTabId && browserViews[activeTabId])) return;
+        const view = browserViews[activeTabId];
+        if (!visible) {
+            mainWindow.removeBrowserView(view);
+            return;
+        }
+        if (!currentBrowserBounds.visible) return; // panel not open; nothing to show
+        mainWindow.setBrowserView(view);
+        const { screen } = require('electron');
+        const winBounds = mainWindow.getBounds();
+        const display = screen.getDisplayMatching(winBounds);
+        const scale = display.scaleFactor || 1.0;
+        const s = process.platform === 'win32' ? scale : 1.0;
+        view.setBounds({
+            x: Math.round(currentBrowserBounds.x * s),
+            y: Math.round(currentBrowserBounds.y * s),
+            width: Math.round(currentBrowserBounds.width * s),
+            height: Math.round(currentBrowserBounds.height * s),
+        });
     });
 
     ipcMain.on('browser-devtools', (event, { tabId }) => {
@@ -476,18 +632,20 @@ function discoverBackendPort() {
 
         const tryNext = () => {
             if (portToTry > 8009) {
-                console.log('Could not find active manual backend on ports 8000-8009.');
+                console.log('[TRACE] [ELECTRON DISCOVERY] Could not find active manual backend on ports 8000-8009.');
                 resolve(null);
                 return;
             }
 
-            const req = http.get(`http://127.0.0.1:${portToTry}/status`, { timeout: 150 }, (res) => {
+            console.log(`[TRACE] [ELECTRON DISCOVERY] Probing http://127.0.0.1:${portToTry}/status...`);
+            const req = http.get(`http://127.0.0.1:${portToTry}/status`, { timeout: 2000 }, (res) => {
                 let body = '';
                 res.on('data', chunk => body += chunk);
                 res.on('end', () => {
                     try {
                         const parsed = JSON.parse(body);
                         if (parsed.status === 'running' && parsed.service === 'Lumina Backend') {
+                            console.log(`[TRACE] [ELECTRON DISCOVERY] Found active manual backend on port ${portToTry}`);
                             resolve(portToTry);
                             return;
                         }
@@ -496,11 +654,13 @@ function discoverBackendPort() {
                     tryNext();
                 });
             });
-            req.on('error', () => {
+            req.on('error', (err) => {
+                console.log(`[TRACE] [ELECTRON DISCOVERY] Port ${portToTry} check error: ${err.message}`);
                 portToTry++;
                 tryNext();
             });
             req.on('timeout', () => {
+                console.log(`[TRACE] [ELECTRON DISCOVERY] Port ${portToTry} check timed out (2s)`);
                 req.destroy();
                 portToTry++;
                 tryNext();

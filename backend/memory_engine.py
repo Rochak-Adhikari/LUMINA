@@ -21,7 +21,7 @@ import os
 import re
 import sqlite3
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -44,7 +44,8 @@ except ImportError:
 # ========================================
 # CONSTANTS
 # ========================================
-EMBEDDING_DIM = 768           # text-embedding-004 default
+EMBEDDING_DIM = 768           # gemini-embedding-001 (pinned via output_dimensionality)
+EMBEDDING_MODEL = "gemini-embedding-001"  # text-embedding-004 is 404 on current API
 MAX_CHUNKS_INJECT = 8         # hard cap on injected excerpts
 MAX_CHUNK_DISPLAY = 240       # truncate each excerpt in prompt prefix
 CHUNK_MAX_CHARS = 800         # chunking window
@@ -113,21 +114,24 @@ class EmbeddingProvider:
         if not api_key:
             print("[MEMORY2] GEMINI_API_KEY not set — using fallback embeddings")
             return
-        # Try v1 first (text-embedding-004 not available on v1beta)
+        # gemini-embedding-001 is served on v1 / v1beta / default. Pin the
+        # output dimensionality to EMBEDDING_DIM so vectors stay compatible with
+        # the existing FAISS/NumPy store (native default is larger).
         for api_ver in ("v1", "v1beta", None):
             try:
                 opts = {"api_version": api_ver} if api_ver else {}
                 client = genai.Client(api_key=api_key, http_options=opts) if opts else genai.Client(api_key=api_key)
                 # Probe: send a tiny embedding request to verify the model works
                 probe = client.models.embed_content(
-                    model="text-embedding-004",
+                    model=EMBEDDING_MODEL,
                     contents=["probe"],
+                    config={"output_dimensionality": EMBEDDING_DIM},
                 )
                 if probe.embeddings:
                     self._client = client
                     self._available = True
                     ver_label = api_ver or "default"
-                    print(f"[MEMORY2] Embedding provider: Google text-embedding-004 (api={ver_label})")
+                    print(f"[MEMORY2] Embedding provider: Google {EMBEDDING_MODEL} (api={ver_label}, dim={EMBEDDING_DIM})")
                     return
             except Exception as e:
                 ver_label = api_ver or "default"
@@ -166,8 +170,9 @@ class EmbeddingProvider:
     def _embed_gemini_sync(self, texts: List[str]) -> List[Optional[np.ndarray]]:
         try:
             result = self._client.models.embed_content(
-                model="text-embedding-004",
+                model=EMBEDDING_MODEL,
                 contents=texts,
+                config={"output_dimensionality": EMBEDDING_DIM},
             )
             embeddings = []
             for emb in result.embeddings:
@@ -367,7 +372,7 @@ class MemoryEngine:
             return None
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).isoformat()
         c.execute(
             "INSERT INTO transcripts (session_id, project_name, role, content, created_at) VALUES (?,?,?,?,?)",
             (session_id, project_name, role, content.strip(), now),
@@ -414,7 +419,7 @@ class MemoryEngine:
             print(f"[MEMORY2] Embedding error during indexing: {e}")
             embeddings = [None] * len(new_chunks)
 
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).isoformat()
         new_ids = []
         valid_embeds = []
 
@@ -663,7 +668,7 @@ class MemoryEngine:
         metadata = self._get_chunk_metadata(all_ids)
 
         # Apply boosts
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         query_lower = query.lower()
         identity_kw = {"my", "i", "me", "prefer", "name", "who", "am", "about"}
         is_identity_query = bool(set(query_lower.split()) & identity_kw)
